@@ -9,7 +9,7 @@
   , TypeFamilies
   #-}
 -- | Provides ways to run a query given a stack of connections.
-module Query.Connection
+module Vaultaire.Query.Connection
        ( MarquiseReader, runMarquiseReader, readSimple
        , MarquiseContents, runMarquiseContents, enumerateAddresses
        , Chevalier, runChevalier, chevalier, chevalierTags
@@ -36,7 +36,7 @@ import qualified Chevalier.Util             as C
 import qualified Chevalier.Types            as C
 import           Marquise.Client  (SocketState(..))
 import           Marquise.IO.Util (consistentEnumerateOrigin, consistentReadSimple)
-import           Query.Base
+import           Vaultaire.Query.Base
 import           Vaultaire.Types
 
 newtype Chevalier        = Chevalier        SocketState
