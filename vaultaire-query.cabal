@@ -1,0 +1,70 @@
+cabal-version:       >= 1.10
+name:                vaultaire-query
+version:             0.3.1.0
+synopsis:            Query library for Vaultaire
+license:             BSD3
+author:              Anchor Engineering <engineering@anchor.com.au>
+maintainer:          Anchor Engineering <engineering@anchor.com.au>
+copyright:           © 2013-2014 Anchor Systems, Pty Ltd and Others
+category:            Other
+tested-with:         GHC == 7.8.3
+stability:           experimental
+
+build-type:          Custom
+
+source-repository    head
+  type:              git
+  location:          git@github.com:anchor/vaultaire-query.git
+
+executable rates
+  hs-source-dirs:     examples
+  default-language:   Haskell2010
+  main-is:            Rates.hs
+  build-depends:      base >=4.7 && <4.8,
+                      transformers,
+                      bytestring,
+                      pipes,
+                      pipes-csv,
+                      pipes-bytestring,
+                      cassava,
+                      data-binary-ieee754,
+                      marquise,
+                      vaultaire-common,
+                      vaultaire-query
+
+library
+  hs-source-dirs:    lib
+  default-language:  Haskell2010
+
+  exposed-modules:   Query
+
+  other-modules:     Query.Base,
+                     Query.Connection,
+                     Query.Combinators
+
+  build-depends:     base >=4.7 && <4.8,
+                     containers >=0.5 && <0.6,
+                     mtl,
+                     transformers,
+                     bifunctors,
+                     either,
+                     errors,
+                     mmorph,
+                     lens,
+                     pipes,
+                     pipes-parse,
+                     postgresql-simple,
+                     text,
+                     zeromq4-haskell,
+                     vaultaire-common,
+                     marquise,
+                     chevalier-common
+
+  ghc-options:       -O2
+                     -threaded
+                     -Wall
+                     -Wwarn
+                     -fwarn-tabs
+                     -with-rtsopts=-T
+
+  ghc-prof-options:  -fprof-auto
