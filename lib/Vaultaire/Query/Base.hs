@@ -7,7 +7,7 @@
   , FlexibleInstances
   , OverlappingInstances
   #-}
-module Query.Base
+module Vaultaire.Query.Base
        (Query)
 where
 

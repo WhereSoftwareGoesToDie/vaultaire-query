@@ -6,10 +6,10 @@
   , TupleSections
   #-}
 -- | Analytics queries on Vaultaire data.
-module Query
+module Vaultaire.Query
        ( Query
-       , module Query.Combinators
-       , module Query.Connection
+       , module Vaultaire.Query.Combinators
+       , module Vaultaire.Query.Connection
          -- * Analytics Queries
        , addresses, addressesAny, addressesAll, metrics, lookupQ, sumPoints, fitWith, fit
          -- * Helpful Predicates for Transforming Queries
@@ -32,9 +32,9 @@ import           Vaultaire.Types
 import           Marquise.Types
 import           Marquise.Client (decodeSimple)
 
-import           Query.Base
-import           Query.Combinators
-import           Query.Connection
+import           Vaultaire.Query.Base
+import           Vaultaire.Query.Combinators
+import           Vaultaire.Query.Connection
 
 -- Combinators specific to vaultaire types -------------------------------------
 

@@ -3,7 +3,7 @@
   , MonadComprehensions
   #-}
 -- | Generic combinators and transformations for queries
-module Query.Combinators
+module Vaultaire.Query.Combinators
        ( aggregate, aggregateQ, takeQ, dropQ, takeWhileQ, dropWhileQ, cacheQ, maybeQ, foreachQ)
 where
 
@@ -13,7 +13,7 @@ import           Data.Map (Map)
 import           Pipes
 import qualified Pipes.Prelude as P
 
-import           Query.Base
+import           Vaultaire.Query.Base
 
 -- | Runs an aggregation function over the result of a query.
 aggregate :: (Producer a m () -> m x) -> Query m a -> m x
