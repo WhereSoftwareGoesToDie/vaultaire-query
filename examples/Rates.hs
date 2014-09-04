@@ -12,7 +12,7 @@ import qualified Pipes.Csv        as P
 
 import           Vaultaire.Types
 import           Marquise.Types
-import           Query
+import           Vaultaire.Query
 
 newtype Rate = Rate { unRate :: Word64 } deriving (Show)
 

@@ -36,11 +36,11 @@ library
   hs-source-dirs:    lib
   default-language:  Haskell2010
 
-  exposed-modules:   Query
+  exposed-modules:   Vaultaire.Query
 
-  other-modules:     Query.Base,
-                     Query.Connection,
-                     Query.Combinators
+  other-modules:     Vaultaire.Query.Base,
+                     Vaultaire.Query.Connection,
+                     Vaultaire.Query.Combinators
 
   build-depends:     base >=4.7 && <4.8,
                      containers >=0.5 && <0.6,
