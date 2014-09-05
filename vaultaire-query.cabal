@@ -1,6 +1,6 @@
 cabal-version:       >= 1.10
 name:                vaultaire-query
-version:             0.3.1.0
+version:             0.4.0.0
 synopsis:            Query library for Vaultaire
 license:             BSD3
 author:              Anchor Engineering <engineering@anchor.com.au>
@@ -23,6 +23,7 @@ executable rates
   build-depends:      base >=4.7 && <4.8,
                       transformers,
                       bytestring,
+                      network-uri,
                       pipes,
                       pipes-csv,
                       pipes-bytestring,
@@ -55,6 +56,7 @@ library
                      pipes-parse,
                      postgresql-simple,
                      text,
+                     network-uri,
                      zeromq4-haskell,
                      vaultaire-common,
                      marquise,
