@@ -18,24 +18,25 @@ module Vaultaire.Query.Connection
        , In(..))
 where
 
-import           Control.Error.Util (syncIO)
+import           Control.Error.Util         (syncIO)
 import           Control.Exception
 import           Control.Monad.Error
 import           Control.Monad.Trans.Either (runEitherT)
 import           Control.Monad.Trans.Reader
-import           Data.Bifunctor (bimap)
+import           Data.Bifunctor             (bimap)
 import           Data.Either
 import qualified Data.Text                  as T
-import           Data.Text.Encoding (encodeUtf8)
+import           Data.Text.Encoding         (encodeUtf8)
 import qualified Database.PostgreSQL.Simple as PG
+import           Network.URI
 import           Pipes
 import qualified Pipes.Lift                 as P
 import qualified System.ZMQ4                as Z
 
 import qualified Chevalier.Util             as C
 import qualified Chevalier.Types            as C
-import           Marquise.Client  (SocketState(..))
-import           Marquise.IO.Util (consistentEnumerateOrigin, consistentReadSimple)
+import           Marquise.Client            (SocketState(..))
+import           Marquise.IO.Util           (consistentEnumerateOrigin, consistentReadSimple)
 import           Vaultaire.Query.Base
 import           Vaultaire.Types
 
@@ -47,35 +48,42 @@ newtype Postgres         = Postgres PG.Connection
 
 -- | Runs the Chevalier daemon in our query environment stack.
 runChevalier :: (MonadSafeIO m)
-             => String
+             => URI
              -> Query (ReaderT Chevalier m) x
              -> Query m x
 runChevalier url = runZMQ url Chevalier
 
 -- | Runs the Marquise reader daemon in our query environment stack.
 runMarquiseReader :: (MonadSafeIO m)
-                  => String
+                  => URI
                   -> Query (ReaderT MarquiseReader m) x
                   -> Query m x
-runMarquiseReader broker = runZMQ ("tcp://" ++ broker ++ ":5570") MarquiseReader
+runMarquiseReader uri = runZMQ uri MarquiseReader
 
 -- | Runs the Marquise contents daemon in our query environment stack.
 runMarquiseContents :: (MonadIO m, MonadError SomeException m)
-                    => String
+                    => URI
                     -> Query (ReaderT MarquiseContents m) x
                     -> Query m x
-runMarquiseContents broker = runZMQ ("tcp://" ++ broker ++ ":5580") MarquiseContents
+runMarquiseContents uri = runZMQ uri MarquiseContents
 
 runZMQ :: (MonadSafeIO m)
-            => String
-            -> (SocketState -> conn)
-            -> Query (ReaderT conn m) x
-            -> Query m x
-runZMQ str mkconn (Select p) = Select $
-  bracketSafe (safeLiftIO $ Z.context) (safeLiftIO . Z.term) $ \ctx ->
-    bracketSafe (safeLiftIO $ Z.socket ctx Z.Dealer) (safeLiftIO . Z.close) $ \sock ->
-      bracketSafe (safeLiftIO $ Z.connect sock str) (const $ safeLiftIO $ Z.disconnect sock str) $ \_ ->
-        P.runReaderP (mkconn $ SocketState sock str) p
+       => URI
+       -> (SocketState -> conn)
+       -> Query (ReaderT conn m) x
+       -> Query m x
+runZMQ uri mkconn (Select p) = Select $
+  bracketSafe (safeLiftIO $ Z.context)
+              (safeLiftIO . Z.term)
+            $ \ctx ->
+  bracketSafe (safeLiftIO $ Z.socket ctx Z.Dealer)
+              (safeLiftIO . Z.close)
+            $ \sock ->
+  bracketSafe (safeLiftIO $ Z.connect sock $ show uri)
+              (const $ safeLiftIO $ Z.disconnect sock $ show uri)
+            $ \_ ->
+  P.runReaderP (mkconn $ SocketState sock $ broker uri) p
+  where broker = maybe "" uriRegName . uriAuthority
 
 -- | Runs the Postgres connection in our query environment stack.
 runPostgres :: (MonadSafeIO m)
