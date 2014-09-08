@@ -40,7 +40,7 @@ import           Marquise.IO.Util           (consistentEnumerateOrigin, consiste
 import           Vaultaire.Query.Base
 import           Vaultaire.Types
 
-newtype Chevalier        = Chevalier        SocketState
+newtype Chevalier        = Chevalier        (Z.Socket Z.Req)
 newtype MarquiseReader   = MarquiseReader   SocketState
 newtype MarquiseContents = MarquiseContents SocketState
 newtype Postgres         = Postgres PG.Connection
@@ -51,28 +51,37 @@ runChevalier :: (MonadSafeIO m)
              => URI
              -> Query (ReaderT Chevalier m) x
              -> Query m x
-runChevalier url = runZMQ url Chevalier
+runChevalier uri (Select p) = Select $
+  bracketSafe (safeLiftIO $ Z.context)
+              (safeLiftIO . Z.term)
+            $ \ctx ->
+  bracketSafe (safeLiftIO $ Z.socket ctx Z.Req)
+              (safeLiftIO . Z.close)
+            $ \sock ->
+  bracketSafe (safeLiftIO $ Z.connect sock $ show uri)
+              (const $ safeLiftIO $ Z.disconnect sock $ show uri)
+            $ \_ -> P.runReaderP (Chevalier sock) p
 
 -- | Runs the Marquise reader daemon in our query environment stack.
 runMarquiseReader :: (MonadSafeIO m)
                   => URI
                   -> Query (ReaderT MarquiseReader m) x
                   -> Query m x
-runMarquiseReader uri = runZMQ uri MarquiseReader
+runMarquiseReader uri = runMarquise uri MarquiseReader
 
 -- | Runs the Marquise contents daemon in our query environment stack.
 runMarquiseContents :: (MonadIO m, MonadError SomeException m)
                     => URI
                     -> Query (ReaderT MarquiseContents m) x
                     -> Query m x
-runMarquiseContents uri = runZMQ uri MarquiseContents
+runMarquiseContents uri = runMarquise uri MarquiseContents
 
-runZMQ :: (MonadSafeIO m)
+runMarquise :: (MonadSafeIO m)
        => URI
        -> (SocketState -> conn)
        -> Query (ReaderT conn m) x
        -> Query m x
-runZMQ uri mkconn (Select p) = Select $
+runMarquise uri mkconn (Select p) = Select $
   bracketSafe (safeLiftIO $ Z.context)
               (safeLiftIO . Z.term)
             $ \ctx ->
@@ -81,8 +90,7 @@ runZMQ uri mkconn (Select p) = Select $
             $ \sock ->
   bracketSafe (safeLiftIO $ Z.connect sock $ show uri)
               (const $ safeLiftIO $ Z.disconnect sock $ show uri)
-            $ \_ ->
-  P.runReaderP (mkconn $ SocketState sock $ broker uri) p
+            $ \_ -> P.runReaderP (mkconn $ SocketState sock $ broker uri) p
   where broker = maybe "" uriRegName . uriAuthority
 
 -- | Runs the Postgres connection in our query environment stack.
@@ -102,7 +110,7 @@ chevalierTags c o = chevalier c o . C.buildRequestFromPairs . encodeTags
   where encodeTags = map (join bimap T.pack)
 
 chevalier :: Chevalier -> Origin -> C.SourceRequest -> Producer (Address, SourceDict) IO ()
-chevalier (Chevalier (SocketState sock _)) origin request = do
+chevalier (Chevalier sock) origin request = do
   resp <- liftIO sendrecv
   -- this needs some rethinking
   each $ either (error . show) (rights . map C.convertSource) (C.decodeResponse resp)
@@ -110,7 +118,9 @@ chevalier (Chevalier (SocketState sock _)) origin request = do
         sendrecv = do
           Z.send sock [Z.SendMore] $ encodeOrigin origin
           Z.send sock []           $ C.encodeRequest request
-          Z.receive sock
+          x <- Z.receive sock
+          return x
+
         -- too much coercion between chevalier-common and query
         encodeOrigin (Origin x) = encodeUtf8 $ T.pack $ show x
 
