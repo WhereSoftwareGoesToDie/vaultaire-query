@@ -13,15 +13,11 @@ module Vaultaire.Query.Connection
        ( MarquiseReader, runMarquiseReader, readSimple
        , MarquiseContents, runMarquiseContents, enumerateAddresses
        , Chevalier, runChevalier, chevalier, chevalierTags
-       , Postgres(..), runPostgres
-       , MonadSafeIO, safeLiftIO, runSafeIO
-       , In(..))
+       , Postgres(..), runPostgres )
+
 where
 
-import           Control.Error.Util         (syncIO)
-import           Control.Exception
-import           Control.Monad.Error
-import           Control.Monad.Trans.Either (runEitherT)
+import           Control.Monad
 import           Control.Monad.Trans.Reader
 import           Data.Bifunctor             (bimap)
 import           Data.Either
@@ -39,6 +35,7 @@ import           Marquise.Client            (SocketState(..))
 import           Marquise.IO.Util           (consistentEnumerateOrigin, consistentReadSimple)
 import           Vaultaire.Query.Base
 import           Vaultaire.Types
+import           Vaultaire.Control.Safe
 
 newtype Chevalier        = Chevalier        (Z.Socket Z.Req)
 newtype MarquiseReader   = MarquiseReader   SocketState
@@ -70,7 +67,7 @@ runMarquiseReader :: (MonadSafeIO m)
 runMarquiseReader uri = runMarquise uri MarquiseReader
 
 -- | Runs the Marquise contents daemon in our query environment stack.
-runMarquiseContents :: (MonadIO m, MonadError SomeException m)
+runMarquiseContents :: (MonadSafeIO m)
                     => URI
                     -> Query (ReaderT MarquiseContents m) x
                     -> Query m x
@@ -114,13 +111,11 @@ chevalier (Chevalier sock) origin request = do
   resp <- liftIO sendrecv
   -- this needs some rethinking
   each $ either (error . show) (rights . map C.convertSource) (C.decodeResponse resp)
-  where -- hm, query shouldn't have to do this
+  where -- hm, query shouldn!l
         sendrecv = do
           Z.send sock [Z.SendMore] $ encodeOrigin origin
           Z.send sock []           $ C.encodeRequest request
-          x <- Z.receive sock
-          return x
-
+          Z.receive sock
         -- too much coercion between chevalier-common and query
         encodeOrigin (Origin x) = encodeUtf8 $ T.pack $ show x
 
@@ -135,48 +130,3 @@ enumerateAddresses :: MarquiseContents
                    -> Origin
                    -> Producer (Address, SourceDict) IO ()
 enumerateAddresses (MarquiseContents c) o = consistentEnumerateOrigin o c
-
-
--- Running a Query -------------------------------------------------------------
-
--- | Constraint a transformer stack @haystack@ to have a transformer @needle@ anywhere in the stack.
---   This relies on @OverlappingInstances@ to find the position of @needle@ in @haystack@,
---   we can use closed type families instead if needed.
-class Monad haystack => In needle haystack where
-  liftT :: (forall m. Monad m => needle m a) -> haystack a
-
-instance (Monad m, Monad (t m)) => In t (t m) where
-  liftT t = t
-
-instance (In t s, MonadTrans t', Monad s, Monad (t' s)) => In t (t' s) where
-  liftT t = lift (liftT t)
-
--- | IO-capable monad that can be used with @safeLiftIO@ to bracket exceptions.
-type MonadSafeIO m = (MonadIO m, MonadError SomeException m)
-
--- | Like @LiftIO@, but ensure that resources are cleaned up even if an IO exception occurs.
-safeLiftIO :: MonadSafeIO m => IO a -> m a
-safeLiftIO = either (throwError) (return) <=< runEitherT . syncIO
-
--- | Like @bracket@, but convert IO exceptions into errors so clean-up can be run.
-bracketSafe :: MonadSafeIO m => m a -> (a -> m b) -> (a -> m c) -> m c
-bracketSafe start finish act = do
-  a <- start
-  catchError (do ret <- act a
-                 _   <- finish a
-                 return ret)
-             (\(exc :: SomeException) -> finish a >> throwError exc)
-
--- orphaned instance of Error since we want to rethrow bracketed IO exceptions
--- should never be run, this is just to satify the Error constraint
--- should be removed when pipes is updated to use the new Except
-instance Error SomeException where
-  strMsg = error
-
--- | Runs the last layer of the transformer stack, which encapsulates exceptions as errors.
---   This rethrows those exceptions into IO (this is needed to clean up resources).
-runSafeIO :: MonadIO m
-          => Query (ErrorT SomeException m) x
-          -> Query m x
-runSafeIO (Select p) = Select $
-  P.runErrorP p >>= either throw return
