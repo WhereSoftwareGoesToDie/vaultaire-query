@@ -116,11 +116,11 @@ main = do queryRespRates <- run $ respRates origin start end
                                           (map (\t -> simpleTime $ point t) queryRespRates)
                                           queryCpuRates
   where origin = read "ABCDEF"
-        start = read "2014-08-03"
-        end   = read "2014-08-04"
+        start  = read "2014-08-03"
+        end    = read "2014-08-04"
         mkURI :: Int -> URI
         mkURI port = nullURI { uriScheme = "tcp:"
                              , uriAuthority = Just $ URIAuth { uriRegName  = "broker.vaultaire.example.com"
-                                                             , uriPort     = show port
+                                                             , uriPort     = ":" ++ show port
                                                              , uriUserInfo = "" } }
         run = P.toListM . every . runSafeIO . runMarquiseReader (mkURI 5570) . runMarquiseContents (mkURI 5580)
