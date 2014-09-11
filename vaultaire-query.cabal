@@ -31,6 +31,7 @@ executable rates
                       data-binary-ieee754,
                       marquise,
                       vaultaire-common,
+                      vaultaire-control,
                       vaultaire-query
 
 library
@@ -59,6 +60,7 @@ library
                      network < 2.6,
                      zeromq4-haskell,
                      vaultaire-common,
+                     vaultaire-control,
                      marquise,
                      chevalier-common
 
