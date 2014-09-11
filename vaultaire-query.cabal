@@ -50,6 +50,7 @@ executable ratescsv
                       marquise,
                       vaultaire-common,
                       vaultaire-query,
+                      vaultaire-control,
                       vector
 
 library
