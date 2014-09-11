@@ -14,6 +14,7 @@ import qualified Pipes.Csv        as P
 import           Vaultaire.Types
 import           Marquise.Types
 import           Vaultaire.Query
+import           Vaultaire.Control.Safe
 
 main :: IO ()
 main = do queryRespRates <- run $ respRates origin start end

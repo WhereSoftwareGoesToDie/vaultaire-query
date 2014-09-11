@@ -14,11 +14,13 @@ import qualified Pipes.Csv        as P
 import           Vaultaire.Types
 import           Marquise.Types
 import           Vaultaire.Query
+import           Vaultaire.Control.Lift
+import           Vaultaire.Control.Safe
 
 main :: IO ()
 main = do queryRespRates <- run $ respRates origin start end
           queryCpuRates  <- run $ cpuRates origin start end
-          putStrLn $ encode $ queryCpuRates
+          putStrLn $ show $ encode $ queryCpuRates
   where origin = read "R82KX1"
         start = read "2014-08-03"
         end   = read "2014-08-04"
