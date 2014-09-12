@@ -92,6 +92,15 @@ fit = fitWith interpolateable
 sumPoints :: Monad m => Query m SimplePoint -> Query m Word64
 sumPoints = aggregateQ (\p -> P.sum (p >-> P.map simplePayload))
 
+
+aggregateCumulativePoints :: Monad m => Query m SimplePoint -> Query m Word64
+aggregateCumulativePoints = aggregateQ (\p -> P.fold helper (0, 0) (\(a, b) -> a + b) p)
+  where
+    helper (sum, last) (SimplePoint _ _ v) =
+        if (v < last)
+            then (sum+last, v)
+            else (sum, v)
+
 -- | Lookup a metadata key.
 lookupQ :: Monad m
         => String         -- ^ key
