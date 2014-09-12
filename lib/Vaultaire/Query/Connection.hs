@@ -26,6 +26,8 @@ import           Data.Text.Encoding         (encodeUtf8)
 import qualified Database.PostgreSQL.Simple as PG
 import           Network.URI
 import           Pipes
+import           Pipes.Safe (MonadSafe)
+import qualified Pipes.Safe                 as P
 import qualified Pipes.Lift                 as P
 import qualified System.ZMQ4                as Z
 
@@ -35,69 +37,59 @@ import           Marquise.Client            (SocketState(..))
 import           Marquise.IO.Util           (consistentEnumerateOrigin, consistentReadSimple)
 import           Vaultaire.Query.Base
 import           Vaultaire.Types
-import           Vaultaire.Control.Safe
 
 newtype Chevalier        = Chevalier        (Z.Socket Z.Req)
 newtype MarquiseReader   = MarquiseReader   SocketState
 newtype MarquiseContents = MarquiseContents SocketState
 newtype Postgres         = Postgres PG.Connection
 
-
 -- | Runs the Chevalier daemon in our query environment stack.
-runChevalier :: (MonadSafeIO m)
+runChevalier :: (MonadSafe m)
              => URI
              -> Query (ReaderT Chevalier m) x
              -> Query m x
 runChevalier uri (Select p) = Select $
-  bracketSafe (safeLiftIO $ Z.context)
-              (safeLiftIO . Z.term)
-            $ \ctx ->
-  bracketSafe (safeLiftIO $ Z.socket ctx Z.Req)
-              (safeLiftIO . Z.close)
-            $ \sock ->
-  bracketSafe (safeLiftIO $ Z.connect sock $ show uri)
-              (const $ safeLiftIO $ Z.disconnect sock $ show uri)
-            $ \_ -> P.runReaderP (Chevalier sock) p
+  P.bracket (liftIO $ Z.context)          (liftIO . Z.term)  $ \ctx  ->
+  P.bracket (liftIO $ Z.socket ctx Z.Req) (liftIO . Z.close) $ \sock ->
+  P.bracket (liftIO $ Z.connect sock (show uri))
+            (const $ liftIO $ Z.disconnect sock (show uri))  $ \_    ->
+            P.runReaderP (Chevalier sock) p
 
 -- | Runs the Marquise reader daemon in our query environment stack.
-runMarquiseReader :: (MonadSafeIO m)
+runMarquiseReader :: (MonadSafe m)
                   => URI
                   -> Query (ReaderT MarquiseReader m) x
                   -> Query m x
 runMarquiseReader uri = runMarquise uri MarquiseReader
 
 -- | Runs the Marquise contents daemon in our query environment stack.
-runMarquiseContents :: (MonadSafeIO m)
+runMarquiseContents :: (MonadSafe m)
                     => URI
                     -> Query (ReaderT MarquiseContents m) x
                     -> Query m x
 runMarquiseContents uri = runMarquise uri MarquiseContents
 
-runMarquise :: (MonadSafeIO m)
-       => URI
-       -> (SocketState -> conn)
-       -> Query (ReaderT conn m) x
-       -> Query m x
+runMarquise :: (MonadSafe m)
+            => URI
+            -> (SocketState -> conn)
+            -> Query (ReaderT conn m) x
+            -> Query m x
 runMarquise uri mkconn (Select p) = Select $
-  bracketSafe (safeLiftIO $ Z.context)
-              (safeLiftIO . Z.term)
-            $ \ctx ->
-  bracketSafe (safeLiftIO $ Z.socket ctx Z.Dealer)
-              (safeLiftIO . Z.close)
-            $ \sock ->
-  bracketSafe (safeLiftIO $ Z.connect sock $ show uri)
-              (const $ safeLiftIO $ Z.disconnect sock $ show uri)
-            $ \_ -> P.runReaderP (mkconn $ SocketState sock $ broker uri) p
+  P.bracket (liftIO $ Z.context)             (liftIO . Z.term)  $ \ctx  ->
+  P.bracket (liftIO $ Z.socket ctx Z.Dealer) (liftIO . Z.close) $ \sock ->
+  P.bracket (liftIO $ Z.connect sock $ show uri)
+            (const $ liftIO $ Z.disconnect sock $ show uri)     $ \_    ->
+            P.runReaderP (mkconn $ SocketState sock $ broker uri) p
   where broker = maybe "" uriRegName . uriAuthority
 
 -- | Runs the Postgres connection in our query environment stack.
-runPostgres :: (MonadSafeIO m)
+runPostgres :: (MonadSafe m)
             => PG.ConnectInfo
             -> Query (ReaderT Postgres m) x
             -> Query m x
 runPostgres pginfo (Select act) = Select $
-  bracketSafe (safeLiftIO $ PG.connect pginfo) (safeLiftIO . PG.close) $ \c ->
-    P.runReaderP (Postgres c) act
+  P.bracket (liftIO $ PG.connect pginfo) (liftIO . PG.close) $ \c ->
+            P.runReaderP (Postgres c) act
 
 
 -- Wrapped Chevalier Interface -------------------------------------------------
