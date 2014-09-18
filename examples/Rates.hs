@@ -1,19 +1,18 @@
 {-# LANGUAGE TransformListComp, MonadComprehensions, TypeOperators, FlexibleContexts, ConstraintKinds #-}
-module Main where
+module Rates where
 
 import           Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as B
 import           Data.Word
 import           Data.Csv
 import           Data.Binary.IEEE754
-import           Network.URI
-import           Pipes
-import qualified Pipes.Prelude    as P
+import           Pipes.Safe
 import qualified Pipes.Csv        as P
 
 import           Vaultaire.Types
 import           Marquise.Types
 import           Vaultaire.Query
+import           Vaultaire.Control.Lift
 
 newtype Rate = Rate { unRate :: Word64 } deriving (Show)
 
@@ -41,7 +40,7 @@ instance P.ToRecord CpuRates where
 
 respRates :: ( ReaderT MarquiseContents `In` m
              , ReaderT MarquiseReader `In` m
-             , MonadSafeIO m)
+             , MonadSafe m)
           => Origin -> TimeStamp -> TimeStamp
           -> Query m RespRates
 respRates origin start end
@@ -55,7 +54,7 @@ respRates origin start end
 
 cpuRates :: ( ReaderT MarquiseContents `In` m
             , ReaderT MarquiseReader `In` m
-            , MonadSafeIO m)
+            , MonadSafe m)
           => Origin -> TimeStamp -> TimeStamp
           -> Query m CpuRates
 cpuRates origin start end
@@ -65,7 +64,8 @@ cpuRates origin start end
     , p            <- metrics origin addr start end
     ]
     where cpuMetadata = ("service", "cpu")
-          hosts = ("host", "bravo140")
+          -- hosts = ("host", "bravo140")
+          hosts = ("host", "fe3.prod.as.ratecity.com.au")
 
 data Product = Product { resp :: SimplePoint
                        , cpu  :: SimplePoint
@@ -108,19 +108,3 @@ interpolate f t p1 p2
       let m = (val' p2 - val' p1) / fromIntegral (time' p2 - time' p1)
           b = val' p1
       in f (SimplePoint 0 t (doubleToWord (m*(fromIntegral (t - time' p1)) + b)))
-
-main :: IO ()
-main = do queryRespRates <- run $ respRates origin start end
-          queryCpuRates  <- run $ cpuRates origin start end
-          putStrLn $ show $ interpolateAt (\x -> CpuRates "" x)
-                                          (map (\t -> simpleTime $ point t) queryRespRates)
-                                          queryCpuRates
-  where origin = read "ABCDEF"
-        start = read "2014-08-03"
-        end   = read "2014-08-04"
-        mkURI :: Int -> URI
-        mkURI port = nullURI { uriScheme = "tcp:"
-                             , uriAuthority = Just $ URIAuth { uriRegName  = "broker.vaultaire.example.com"
-                                                             , uriPort     = show port
-                                                             , uriUserInfo = "" } }
-        run = P.toListM . every . runSafeIO . runMarquiseReader (mkURI 5570) . runMarquiseContents (mkURI 5580)

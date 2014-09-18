@@ -35,6 +35,7 @@ import           Marquise.Client (decodeSimple)
 import           Vaultaire.Query.Base
 import           Vaultaire.Query.Combinators
 import           Vaultaire.Query.Connection
+import           Vaultaire.Control.Lift
 
 -- Combinators specific to vaultaire types -------------------------------------
 
