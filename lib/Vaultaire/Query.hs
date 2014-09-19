@@ -11,7 +11,7 @@ module Vaultaire.Query
        , module Vaultaire.Query.Combinators
        , module Vaultaire.Query.Connection
          -- * Analytics Queries
-       , addresses, addressesAny, addressesAll, metrics, lookupQ, sumPoints, fitWith, fit, aggregateCumulativePoints
+       , addresses, addressesAny, addressesAll, metrics, eventMetrics, lookupQ, sumPoints, fitWith, fit, aggregateCumulativePoints
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
        )
@@ -26,13 +26,8 @@ import           Pipes
 import           Pipes.Lift
 import qualified Pipes.Prelude              as P
 import qualified Pipes.Parse                as P
-import           Pipes.Safe
 import qualified Data.Text                  as T
-import           Data.Maybe
-import           Network.URI
 
-import qualified Chevalier.Types as C
-import           Chevalier.Util
 import           Vaultaire.Types
 import           Marquise.Types
 import           Marquise.Client (decodeSimple)
@@ -158,33 +153,16 @@ metrics origin addr start end = Select $ do
   c <- liftT ask
   hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
 
-
-hostQuery :: (MonadSafe m)
-          => String
-          -> TimeStamp
-          -> TimeStamp
-          -> Producer (String, String, TimeStamp, Word64) m ()
-hostQuery host start end = do
-  every $ runChevalier (fromJust $ parseURI "tcp://chevalier-02.syd1.anchor.net.au:6283")
-        $ runMarquiseReader (fromJust $ parseURI "tcp://chateau-02.syd1.anchor.net.au:5570")
-        $ query
-  where query =
-          [ (name, uom, ts, payload)
-          | origin      <- foreachQ [read "R82KX1"]
-          , request     <- foreachQ $ [wildcardQuery [T.pack host]]
-          , (addr, sd)  <- addressesWith origin request
-          , (SimplePoint _ ts payload) <- metrics origin addr start end
-          , name        <- if (fuzzy sd ("host", ""))
-                           then lookupQ "host" sd
-                           else lookupQ "hostname" sd
-          , uom         <- lookupQ "uom" sd
-          ]
-
-addressesWith :: ( ReaderT Chevalier `In` m, MonadIO m )
-              => Origin -> C.SourceRequest -> Query m (Address, SourceDict)
-addressesWith org request = Select $ do
+-- | To construct event based data correctly we need to query over all time
+eventMetrics :: (ReaderT MarquiseReader `In` m, MonadIO m)
+            => Origin
+            -> Address
+            -> Query m SimplePoint -- ^ result data point
+eventMetrics origin addr = Select $ do
+  let start = (TimeStamp 0)
+  end <- liftIO getCurrentTimeNanoseconds
   c <- liftT ask
-  hoist liftIO $ chevalier c org request
+  hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
 
 -- Helpers ---------------------------------------------------------------------
 
