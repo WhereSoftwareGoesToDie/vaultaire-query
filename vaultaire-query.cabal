@@ -1,6 +1,6 @@
 cabal-version:       >= 1.10
 name:                vaultaire-query
-version:             0.4.0.0
+version:             0.4.1.0
 synopsis:            Query library for Vaultaire
 license:             BSD3
 author:              Anchor Engineering <engineering@anchor.com.au>
@@ -15,45 +15,6 @@ build-type:          Custom
 source-repository    head
   type:              git
   location:          git@github.com:anchor/vaultaire-query.git
-
-executable ratesinterpolate
-  hs-source-dirs:     examples
-  default-language:   Haskell2010
-  main-is:            RatesInterpolate.hs
-  build-depends:      base >=4.7 && <4.8,
-                      transformers,
-                      bytestring,
-                      network < 2.6,
-                      pipes,
-                      pipes-safe,
-                      pipes-csv,
-                      pipes-bytestring,
-                      cassava,
-                      data-binary-ieee754,
-                      marquise,
-                      vaultaire-common,
-                      vaultaire-control,
-                      vaultaire-query
-
-executable ratescsv
-  hs-source-dirs:     examples
-  default-language:   Haskell2010
-  main-is:            RatesCSV.hs
-  build-depends:      base >=4.7 && <4.8,
-                      transformers,
-                      bytestring,
-                      network < 2.6,
-                      pipes,
-                      pipes-csv,
-                      pipes-safe,
-                      pipes-bytestring,
-                      cassava,
-                      data-binary-ieee754,
-                      marquise,
-                      vaultaire-common,
-                      vaultaire-query,
-                      vaultaire-control,
-                      vector
 
 library
   hs-source-dirs:    lib
