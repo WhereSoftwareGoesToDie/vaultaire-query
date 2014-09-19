@@ -12,6 +12,7 @@ module Vaultaire.Query
        , module Vaultaire.Query.Connection
          -- * Analytics Queries
        , addresses, addressesAny, addressesAll, metrics, lookupQ, sumPoints, fitWith, fit
+       , aggregateCumulativePoints
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
        )
@@ -27,6 +28,7 @@ import           Pipes.Lift
 import qualified Pipes.Prelude              as P
 import qualified Pipes.Parse                as P
 import qualified Data.Text                  as T
+import           Prelude hiding (sum, last)
 
 import           Vaultaire.Types
 import           Marquise.Types
