@@ -11,7 +11,8 @@ module Vaultaire.Query
        , module Vaultaire.Query.Combinators
        , module Vaultaire.Query.Connection
          -- * Analytics Queries
-       , addresses, addressesAny, addressesAll, metrics, lookupQ, sumPoints, fitWith, fit
+       , addresses, addressesAny, addressesAll, metrics, eventMetrics, lookupQ, sumPoints, fitWit
+       , fit, aggregateCumulativePoints
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
        )
@@ -27,6 +28,7 @@ import           Pipes.Lift
 import qualified Pipes.Prelude              as P
 import qualified Pipes.Parse                as P
 import qualified Data.Text                  as T
+import           Prelude hiding (sum, last)
 
 import           Vaultaire.Types
 import           Marquise.Types
@@ -35,6 +37,7 @@ import           Marquise.Client (decodeSimple)
 import           Vaultaire.Query.Base
 import           Vaultaire.Query.Combinators
 import           Vaultaire.Query.Connection
+import           Vaultaire.Control.Lift
 
 -- Combinators specific to vaultaire types -------------------------------------
 
@@ -92,13 +95,27 @@ fit = fitWith interpolateable
 sumPoints :: Monad m => Query m SimplePoint -> Query m Word64
 sumPoints = aggregateQ (\p -> P.sum (p >-> P.map simplePayload))
 
+
+
+-- | Openstack cumulative data is from last startup.
+--   So when we process cumulative data we need to account for this.
+--   Since (excluding restarts) each point is strictly non-decreasing,
+--   we simply use a modified fold to deal with the case where the latest point
+--   is less than the second latest point (indicating a restart)
+aggregateCumulativePoints :: Monad m => Query m SimplePoint -> Query m Word64
+aggregateCumulativePoints = aggregateQ (\p -> P.fold helper (0, 0) (\(a, b) -> a + b) p)
+  where
+    helper (sum, last) (SimplePoint _ _ v) =
+        if (v < last)
+            then (sum+last, v)
+            else (sum, v)
+
 -- | Lookup a metadata key.
 lookupQ :: Monad m
         => String         -- ^ key
         -> SourceDict     -- ^ metadata map
         -> Query m String -- ^ result as a query
 lookupQ s d = [ T.unpack x | x <- maybeQ $ lookupSource (T.pack s) d ]
-
 
 -- Built-in Marquise Queries ---------------------------------------------------
 
@@ -144,6 +161,16 @@ metrics origin addr start end = Select $ do
   c <- liftT ask
   hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
 
+-- | To construct event based data correctly we need to query over all time
+eventMetrics :: (ReaderT MarquiseReader `In` m, MonadIO m)
+            => Origin
+            -> Address
+            -> Query m SimplePoint -- ^ result data point
+eventMetrics origin addr = Select $ do
+  let start = (TimeStamp 0)
+  end <- liftIO getCurrentTimeNanoseconds
+  c <- liftT ask
+  hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
 
 -- Helpers ---------------------------------------------------------------------
 
