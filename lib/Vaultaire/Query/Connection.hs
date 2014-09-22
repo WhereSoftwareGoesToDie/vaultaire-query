@@ -49,11 +49,10 @@ runChevalier :: (MonadSafe m)
              -> Query (ReaderT Chevalier m) x
              -> Query m x
 runChevalier uri (Select p) = Select $
-  P.bracket (liftIO $ Z.context)          (liftIO . Z.term)  $ \ctx  ->
-  P.bracket (liftIO $ Z.socket ctx Z.Req) (liftIO . Z.close) $ \sock ->
-  P.bracket (liftIO $ Z.connect sock (show uri))
-            (const $ liftIO $ Z.close sock)  $ \_    ->
-            P.runReaderP (Chevalier sock) p
+  P.bracket (liftIO $ Z.context)                 (liftIO . Z.term)   $ \ctx  ->
+  P.bracket (liftIO $ Z.socket ctx Z.Req)        (liftIO . Z.close)  $ \sock ->
+  P.bracket (liftIO $ Z.connect sock $ show uri) (const $ return ()) $ \_    ->
+    P.runReaderP (Chevalier sock) p
 
 -- | Runs the Marquise reader daemon in our query environment stack.
 runMarquiseReader :: (MonadSafe m)
@@ -75,11 +74,10 @@ runMarquise :: (MonadSafe m)
             -> Query (ReaderT conn m) x
             -> Query m x
 runMarquise uri mkconn (Select p) = Select $
-  P.bracket (liftIO $ Z.context)             (liftIO . Z.term)  $ \ctx  ->
-  P.bracket (liftIO $ Z.socket ctx Z.Dealer) (liftIO . Z.close) $ \sock ->
-  P.bracket (liftIO $ Z.connect sock $ show uri)
-            (const $ liftIO $ Z.close sock)     $ \_    ->
-            P.runReaderP (mkconn $ SocketState sock $ broker uri) p
+  P.bracket (liftIO $ Z.context)                 (liftIO . Z.term)   $ \ctx  ->
+  P.bracket (liftIO $ Z.socket ctx Z.Dealer)     (liftIO . Z.close)  $ \sock ->
+  P.bracket (liftIO $ Z.connect sock $ show uri) (const $ return ()) $ \_    ->
+    P.runReaderP (mkconn $ SocketState sock $ broker uri) p
   where broker = maybe "" uriRegName . uriAuthority
 
 -- | Runs the Postgres connection in our query environment stack.
