@@ -11,8 +11,8 @@ module Vaultaire.Query
        , module Vaultaire.Query.Combinators
        , module Vaultaire.Query.Connection
          -- * Analytics Queries
-       , addresses, addressesAny, addressesAll, metrics, eventMetrics, lookupQ, sumPoints, fitWith
-       , fit, aggregateCumulativePoints
+       , addresses, addressesAny, addressesAll, metrics, eventMetrics, lookupQ, sumPoints
+       , fitWith , fit, aggregateCumulativePoints
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
        )
