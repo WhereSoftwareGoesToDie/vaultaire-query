@@ -16,23 +16,6 @@ source-repository    head
   type:              git
   location:          git@github.com:anchor/vaultaire-query.git
 
-executable rates
-  hs-source-dirs:     examples
-  default-language:   Haskell2010
-  main-is:            Rates.hs
-  build-depends:      base >=4.7 && <4.8,
-                      transformers,
-                      bytestring,
-                      network < 2.6,
-                      pipes,
-                      pipes-csv,
-                      pipes-bytestring,
-                      cassava,
-                      data-binary-ieee754,
-                      marquise,
-                      vaultaire-common,
-                      vaultaire-query
-
 library
   hs-source-dirs:    lib
   default-language:  Haskell2010
