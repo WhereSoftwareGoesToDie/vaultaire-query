@@ -11,11 +11,11 @@ module Vaultaire.Query
        , module Vaultaire.Query.Combinators
        , module Vaultaire.Query.Connection
          -- * Analytics Queries
-       , addresses, addressesAny, addressesAll, metrics, eventMetrics, lookupQ, sumPoints
+       , addresses, addressesAny, addressesAll, addressesWith, metrics
+       , eventMetrics, lookupQ, sumPoints
        , fitWith , fit, aggregateCumulativePoints
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
-       , hostQuery
        )
 where
 
@@ -166,28 +166,6 @@ metrics :: (ReaderT MarquiseReader `In` m, MonadIO m)
 metrics origin addr start end = Select $ do
   c <- liftT ask
   hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
-
-hostQuery :: (MonadSafe m)
-          => String
-          -> TimeStamp
-          -> TimeStamp
-          -> Producer (String, String, String, TimeStamp, Word64) m ()
-hostQuery host start end = do
-  every $ runChevalier (fromJust $ parseURI "tcp://chevalier-02.syd1.anchor.net.au:6283")
-        $ runMarquiseReader (fromJust $ parseURI "tcp://chateau-02.syd1.anchor.net.au:5570")
-        $ query
-  where query =
-          [ (host, metric, uom, ts, payload)
-          | origin      <- foreachQ [read "R82KX1"]
-          , request     <- foreachQ $ [wildcardQuery [T.pack host]]
-          , (addr, sd)  <- addressesWith origin request
-          , (SimplePoint _ ts payload) <- metrics origin addr start end
-          , host        <- if (fuzzy sd ("host", ""))
-                           then lookupQ "host" sd
-                           else lookupQ "hostname" sd
-          , metric      <- lookupQ "metric" sd
-          , uom         <- lookupQ "uom" sd
-          ]
 
 addressesWith :: ( ReaderT Chevalier `In` m, MonadIO m )
               => Origin -> C.SourceRequest -> Query m (Address, SourceDict)
