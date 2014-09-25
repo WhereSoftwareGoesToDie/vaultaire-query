@@ -11,7 +11,8 @@ module Vaultaire.Query
        , module Vaultaire.Query.Combinators
        , module Vaultaire.Query.Connection
          -- * Analytics Queries
-       , addresses, addressesAny, addressesAll, metrics, lookupQ, sumPoints, fitWith, fit
+       , addresses, addressesAny, addressesAll, metrics, eventMetrics, lookupQ, sumPoints
+       , fitWith , fit, aggregateCumulativePoints
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
        , hostQuery
@@ -31,6 +32,7 @@ import           Pipes.Safe
 import qualified Data.Text                  as T
 import           Data.Maybe
 import           Network.URI
+import           Prelude hiding (sum, last)
 
 import qualified Chevalier.Types as C
 import           Chevalier.Util
@@ -121,7 +123,6 @@ lookupQ :: Monad m
         -> Query m String -- ^ result as a query
 lookupQ s d = [ T.unpack x | x <- maybeQ $ lookupSource (T.pack s) d ]
 
-
 -- Built-in Marquise Queries ---------------------------------------------------
 
 -- | All addresses (and their metadata) from an origin.
@@ -193,6 +194,18 @@ addressesWith :: ( ReaderT Chevalier `In` m, MonadIO m )
 addressesWith org request = Select $ do
   c <- liftT ask
   hoist liftIO $ chevalier c org request
+
+-- | To construct event based data correctly we need to query over all time
+eventMetrics :: (ReaderT MarquiseReader `In` m, MonadIO m)
+            => Origin
+            -> Address
+            -> Query m SimplePoint -- ^ result data point
+eventMetrics origin addr = Select $ do
+  let start = (TimeStamp 0)
+  end <- liftIO getCurrentTimeNanoseconds
+  c <- liftT ask
+  hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
+
 
 -- Helpers ---------------------------------------------------------------------
 
