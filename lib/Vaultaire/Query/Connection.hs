@@ -77,8 +77,7 @@ runMarquise uri mkconn (Select p) = Select $
   P.bracket (liftIO $ Z.context)                 (liftIO . Z.term)   $ \ctx  ->
   P.bracket (liftIO $ Z.socket ctx Z.Dealer)     (liftIO . Z.close)  $ \sock ->
   P.bracket (liftIO $ Z.connect sock $ show uri) (const $ return ()) $ \_    ->
-    P.runReaderP (mkconn $ SocketState sock $ broker uri) p
-  where broker = maybe "" uriRegName . uriAuthority
+    P.runReaderP (mkconn $ SocketState sock $ show uri) p
 
 -- | Runs the Postgres connection in our query environment stack.
 runPostgres :: (MonadSafe m)
