@@ -35,7 +35,6 @@ import           Network.URI
 import           Prelude hiding (sum, last)
 
 import qualified Chevalier.Types as C
-import           Chevalier.Util
 import           Vaultaire.Types
 import           Marquise.Types
 import           Marquise.Client (decodeSimple)
@@ -167,12 +166,6 @@ metrics origin addr start end = Select $ do
   c <- liftT ask
   hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
 
-addressesWith :: ( ReaderT Chevalier `In` m, MonadIO m )
-              => Origin -> C.SourceRequest -> Query m (Address, SourceDict)
-addressesWith org request = Select $ do
-  c <- liftT ask
-  hoist liftIO $ chevalier c org request
-
 -- | To construct event based data correctly we need to query over all time
 eventMetrics :: (ReaderT MarquiseReader `In` m, MonadIO m)
             => Origin
@@ -184,6 +177,16 @@ eventMetrics origin addr = Select $ do
   c <- liftT ask
   hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
 
+-- Built-in Chevalier Queries --------------------------------------------------
+
+addressesWith :: MonadSafe m
+              => URI
+              -> Origin
+              -> C.SourceRequest
+              -> Query m (Address, SourceDict)
+addressesWith chev org request = runChevalier chev $ Select $ do
+  c <- liftT ask
+  hoist liftIO $ chevalier c org request
 
 -- Helpers ---------------------------------------------------------------------
 
