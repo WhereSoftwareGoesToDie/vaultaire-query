@@ -4,7 +4,7 @@
   #-}
 -- | Generic combinators and transformations for queries
 module Vaultaire.Query.Combinators
-       ( aggregate, aggregateQ, takeQ, dropQ, takeWhileQ, dropWhileQ, cacheQ, maybeQ, foreachQ)
+       ( aggregate, aggregateQ, takeQ, dropQ, takeWhileQ, dropWhileQ, cacheQ, maybeQ, foreach, one)
 where
 
 import           Control.Monad.Error
@@ -43,5 +43,8 @@ cacheQ = aggregateQ (P.fold insert' M.empty id)
 maybeQ :: Monad m => Maybe a -> Query m a
 maybeQ = Select . each
 
-foreachQ :: (Monad m, Foldable f) => f a -> Query m a
-foreachQ = Select . each
+foreach :: (Monad m, Foldable f) => f a -> Query m a
+foreach = Select . each
+
+one :: (Monad m) => a -> Query m a
+one = Select . each . (:[])
