@@ -22,10 +22,6 @@ before_install:
   - sudo chown $USER /var/spool/marquise/
 
 install:
-  # Hackage is utterly unusable right now (timeouts and 504 errors), and a lot
-  # of Travis builds don't even get to the point of testing the code because
-  # the environment can't download the necessary packages. This may help.
-  - 'sed -r -i "s,^(remote-repo: hackage.haskell.org.*)$,\1\nremote-repo: hackage.syd1.anchor.net.au:http://hackage.syd1.anchor.net.au/packages/archive," /home/travis/.cabal/config'
   - 'cabal-$CABALVER update'
   - 'cabal-$CABALVER sandbox init'
   -  git clone https://github.com/anchor/vaultaire-common.git ../vaultaire-common/
