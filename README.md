@@ -1,19 +1,8 @@
-# vaultaire-query
+# vaultaire-query [![Build Status](https://travis-ci.org/anchor/vaultaire-query.svg?branch=master)](https://travis-ci.org/anchor/vaultaire-query)
 
-Query over a producer is just a 'ListT'. To construct a query:
+This package provides:
 
-  * Use 'Select' on a 'Producer', see the 'Pipes' documentation.
-  * Use list comprehensions syntax, example:
-
-      ```
-      query :: Query m (Person, Role)
-      query = [ (person, role)
-              | person <- Select $ people
-              , age person < 30
-              , role   <- possibleRoles ]
-
-      people        :: Producer Person m ()
-      possibleRoles :: Query m Role
-      ```
-
-    The above query construct a product of ``Person`` and ``Role``, SQL-style.
+  * ``Query``: a whole exciting new type synonym for ``pipes``'s ``ListT``, so you can build up queries list-comprehension style.
+  * Some basic combinators for manipulating queries
+  * ``vaultaire``-specific queries
+  * Connection layers to add vaultaire users such as ``marquise`` as a backend for ``vaultaire-query``
