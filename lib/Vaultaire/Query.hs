@@ -100,8 +100,6 @@ fit = fitWith interpolateable
 sumPoints :: Monad m => Query m SimplePoint -> Query m Word64
 sumPoints = aggregateQ (\p -> P.sum (p >-> P.map simplePayload))
 
-
-
 -- | Openstack cumulative data is from last startup.
 --   So when we process cumulative data we need to account for this.
 --   Since (excluding restarts) each point is strictly non-decreasing,
