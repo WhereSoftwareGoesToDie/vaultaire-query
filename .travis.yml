@@ -38,4 +38,4 @@ script:
   - 'cabal-$CABALVER configure --enable-tests'
   - 'cabal-$CABALVER build'
   - 'cabal-$CABALVER sdist'
-  - 'cabal-$CABALVER query-tests'
+  - 'cabal-$CABALVER test'
