@@ -105,11 +105,17 @@ sumPoints = aggregateQ (\p -> P.sum (p >-> P.map simplePayload))
 --   Since (excluding restarts) each point is strictly non-decreasing,
 --   we simply use a modified fold to deal with the case where the latest point
 --   is less than the second latest point (indicating a restart)
-aggregateCumulativePoints :: Monad m => Query m SimplePoint -> Query m Word64
-aggregateCumulativePoints = aggregateQ (\p -> P.fold helper (0, 0) (\(a, b) -> a + b) p)
+aggregateCumulativePoints :: Monad m => Query m SimplePoint -> m Word64
+aggregateCumulativePoints (Select points) = do
+    first <- P.head points
+    case first of
+        Nothing -> return 0
+        Just p  -> do
+            let v = simplePayload p
+            P.fold helper (0, v) (\(a, b) -> a + b - v) points
   where
     helper (sum, last) (SimplePoint _ _ v) =
-        if (v < last)
+        if v < last
             then (sum+last, v)
             else (sum, v)
 
@@ -139,7 +145,7 @@ addressesAny :: (ReaderT MarquiseContents `In` m, MonadIO m)
 addressesAny origin mds
  = [ (addr, sd)
    | (addr, sd) <- addresses origin
-   , or $ map (fuzzy sd) mds
+   , any (fuzzy sd) mds
    ]
 
 -- | Addresses whose metadata match (fuzzily) all in a set of metadata key-values.
@@ -150,7 +156,7 @@ addressesAll :: (ReaderT MarquiseContents `In` m, MonadIO m)
 addressesAll origin mds
  = [ (addr, sd)
    | (addr, sd) <- addresses origin
-   , and $ map (fuzzy sd) mds
+   , all (fuzzy sd) mds
    ]
 
 -- | Data points for an address over some period of time.
@@ -170,7 +176,7 @@ eventMetrics :: (ReaderT MarquiseReader `In` m, MonadIO m)
             -> Address
             -> Query m SimplePoint -- ^ result data point
 eventMetrics origin addr = Select $ do
-  let start = (TimeStamp 0)
+  let start = TimeStamp 0
   end <- liftIO getCurrentTimeNanoseconds
   c <- liftT ask
   hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
@@ -194,7 +200,7 @@ fuzzy sd (k,v) = case lookupSource (T.pack k) sd of
   Nothing -> False
 
 fuzzyAny :: SourceDict -> [(String, String)] -> Bool
-fuzzyAny sd = or . map (fuzzy sd)
+fuzzyAny sd = any (fuzzy sd)
 
 fuzzyAll :: SourceDict -> [(String, String)] -> Bool
-fuzzyAll sd = and . map (fuzzy sd)
+fuzzyAll sd = all (fuzzy sd)

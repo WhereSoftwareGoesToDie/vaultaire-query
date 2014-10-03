@@ -1,6 +1,6 @@
 cabal-version:       >= 1.10
 name:                vaultaire-query
-version:             0.4.2.0
+version:             0.4.3.0
 synopsis:            Query library for Vaultaire
 license:             BSD3
 author:              Anchor Engineering <engineering@anchor.com.au>
