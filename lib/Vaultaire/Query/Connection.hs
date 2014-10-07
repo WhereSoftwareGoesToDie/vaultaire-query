@@ -34,7 +34,7 @@ import qualified System.ZMQ4                as Z
 import qualified Chevalier.Util             as C
 import qualified Chevalier.Types            as C
 import           Marquise.Client            (SocketState(..))
-import           Marquise.IO.Util           (consistentEnumerateOrigin, consistentReadSimple)
+import qualified Marquise.Client            as M
 import           Vaultaire.Query.Base
 import           Vaultaire.Types
 
@@ -113,9 +113,9 @@ chevalier (Chevalier sock) origin request = do
 readSimple :: MarquiseReader
            -> Address -> TimeStamp -> TimeStamp -> Origin
            -> Producer SimpleBurst IO ()
-readSimple (MarquiseReader c) a s e o = consistentReadSimple a s e o c
+readSimple (MarquiseReader c) a s e o = M.readSimple a s e o c
 
 enumerateAddresses :: MarquiseContents
                    -> Origin
                    -> Producer (Address, SourceDict) IO ()
-enumerateAddresses (MarquiseContents c) o = consistentEnumerateOrigin o c
+enumerateAddresses (MarquiseContents c) o = M.enumerateOrigin o c
