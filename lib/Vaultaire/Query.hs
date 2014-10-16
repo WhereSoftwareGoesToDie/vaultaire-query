@@ -24,20 +24,24 @@ import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State.Strict
 import           Control.Lens (view)
 import           Data.Word
+import           Data.Either
+import qualified Data.Text                  as T
+import           Data.Text.Encoding         (encodeUtf8)
 import           Pipes
 import           Pipes.Lift
 import qualified Pipes.Prelude              as P
 import qualified Pipes.Parse                as P
 import           Pipes.Safe
-import qualified Data.Text                  as T
 import           Data.Maybe
 import           Network.URI
+import qualified System.ZMQ4                as Z
 import           Prelude hiding (sum, last)
 
-import qualified Chevalier.Types as C
 import           Vaultaire.Types
 import           Marquise.Types
-import           Marquise.Client (decodeSimple)
+import qualified Marquise.Client            as M
+import qualified Chevalier.Util             as C
+import qualified Chevalier.Types            as C
 
 import           Vaultaire.Query.Base
 import           Vaultaire.Query.Combinators
@@ -107,12 +111,12 @@ sumPoints = aggregateQ (\p -> P.sum (p >-> P.map simplePayload))
 --   is less than the second latest point (indicating a restart)
 aggregateCumulativePoints :: Monad m => Query m SimplePoint -> m Word64
 aggregateCumulativePoints (Select points) = do
-    first <- P.head points
+    first <- P.next points
     case first of
-        Nothing -> return 0
-        Just p  -> do
+        Left _ -> return 0
+        Right (p, points')  -> do
             let v = simplePayload p
-            P.fold helper (0, v) (\(a, b) -> a + b - v) points
+            P.fold helper (0, v) (\(a, b) -> a + b - v) points'
   where
     helper (sum, last) (SimplePoint _ _ v) =
         if v < last
@@ -129,57 +133,74 @@ lookupQ s d = [ T.unpack x | x <- maybeQ $ lookupSource (T.pack s) d ]
 -- Built-in Marquise Queries ---------------------------------------------------
 
 -- | All addresses (and their metadata) from an origin.
-addresses :: (ReaderT MarquiseContents `In` m, MonadIO m)
-          => Origin
+addresses :: MonadSafe m
+          => URI
+          -> Origin
           -> Query m (Address, SourceDict) -- ^ result address and its metadata map
-addresses origin = Select $ do
-  c <- liftT ask
-  hoist liftIO $ enumerateAddresses c origin
+addresses uri origin = Select $ enumerateOrigin uri origin
 
 -- | Addresses whose metadata match (fuzzily) any in a set of metadata key-values.
 --   e.g. @addressesAny origin [("nginx", "error-rates"), ("metric", "cpu")]@
-addressesAny :: (ReaderT MarquiseContents `In` m, MonadIO m)
-             => Origin
+addressesAny :: MonadSafe m
+             => URI
+             -> Origin
              -> [(String, String)]            -- ^ metadata key-value constraints (fuzzy on values)
              -> Query m (Address, SourceDict) -- ^ result address and its metadata map
-addressesAny origin mds
+addressesAny uri origin mds
  = [ (addr, sd)
-   | (addr, sd) <- addresses origin
+   | (addr, sd) <- addresses uri origin
    , any (fuzzy sd) mds
    ]
 
 -- | Addresses whose metadata match (fuzzily) all in a set of metadata key-values.
-addressesAll :: (ReaderT MarquiseContents `In` m, MonadIO m)
-             => Origin
+addressesAll :: MonadSafe m
+             => URI
+             -> Origin
              -> [(String, String)]            -- ^ metadata key-value constraints (fuzzy on values)
              -> Query m (Address, SourceDict) -- ^ result address and its metadata map
-addressesAll origin mds
+addressesAll uri origin mds
  = [ (addr, sd)
-   | (addr, sd) <- addresses origin
+   | (addr, sd) <- addresses uri origin
    , all (fuzzy sd) mds
    ]
 
 -- | Data points for an address over some period of time.
-metrics :: (ReaderT MarquiseReader `In` m, MonadIO m)
-            => Origin
-            -> Address
-            -> TimeStamp           -- ^ start
-            -> TimeStamp           -- ^ end
-            -> Query m SimplePoint -- ^ result data point
-metrics origin addr start end = Select $ do
-  c <- liftT ask
-  hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
+metrics :: MonadSafe m
+        => URI
+        -> Origin
+        -> Address
+        -> TimeStamp           -- ^ start
+        -> TimeStamp           -- ^ end
+        -> Query m SimplePoint -- ^ result data point
+metrics uri origin addr start end = Select $ do
+  readSimple uri addr start end origin >-> M.decodeSimple
 
 -- | To construct event based data correctly we need to query over all time
-eventMetrics :: (ReaderT MarquiseReader `In` m, MonadIO m)
-            => Origin
-            -> Address
-            -> Query m SimplePoint -- ^ result data point
-eventMetrics origin addr = Select $ do
+eventMetrics :: MonadSafe m
+             => URI
+             -> Origin
+             -> Address
+             -> Query m SimplePoint -- ^ result data point
+eventMetrics uri origin addr = Select $ do
   let start = TimeStamp 0
   end <- liftIO getCurrentTimeNanoseconds
-  c <- liftT ask
-  hoist liftIO $ readSimple c addr start end origin >-> decodeSimple
+  readSimple uri addr start end origin >-> M.decodeSimple
+
+readSimple :: MonadSafe m
+           => URI
+           -> Address -> TimeStamp -> TimeStamp -> Origin
+           -> Producer SimpleBurst m ()
+readSimple uri a s e o = runMarquiseReader uri $ do
+  (MarquiseReader c) <- lift ask
+  hoist liftIO $ M.readSimple a s e o c
+
+enumerateOrigin :: MonadSafe m
+                   => URI
+                   -> Origin
+                   -> Producer (Address, SourceDict) m ()
+enumerateOrigin uri o = runMarquiseContents uri $ do
+  (MarquiseContents c) <- liftT ask
+  hoist liftIO $ M.enumerateOrigin o c
 
 -- Built-in Chevalier Queries --------------------------------------------------
 
@@ -191,6 +212,18 @@ addressesWith :: MonadSafe m
 addressesWith chev org request = runChevalier chev $ Select $ do
   c <- liftT ask
   hoist liftIO $ chevalier c org request
+
+chevalier :: Chevalier -> Origin -> C.SourceRequest
+          -> Producer (Address, SourceDict) IO ()
+chevalier (Chevalier sock) origin request = do
+  resp <- liftIO sendrecv
+  -- this doesn't actually stream because chevalier doesn't
+  each $ either (error . show) (rights . map C.convertSource) (C.decodeResponse resp)
+  where sendrecv = do
+          Z.send sock [Z.SendMore] $ encodeOrigin origin
+          Z.send sock []           $ C.encodeRequest request
+          Z.receive sock
+        encodeOrigin (Origin x) = encodeUtf8 $ T.pack $ show x
 
 -- Helpers ---------------------------------------------------------------------
 
