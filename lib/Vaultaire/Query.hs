@@ -111,10 +111,10 @@ sumPoints = aggregateQ (\p -> P.sum (p >-> P.map simplePayload))
 --   is less than the second latest point (indicating a restart)
 aggregateCumulativePoints :: Monad m => Query m SimplePoint -> m Word64
 aggregateCumulativePoints (Select points) = do
-    first <- P.next points
-    case first of
+    res <- next points
+    case res of
         Left _ -> return 0
-        Right (p, points')  -> do
+        Right (p, points') -> do
             let v = simplePayload p
             P.fold helper (0, v) (\(a, b) -> a + b - v) points'
   where
