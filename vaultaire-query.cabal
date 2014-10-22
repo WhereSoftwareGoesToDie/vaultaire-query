@@ -37,7 +37,6 @@ library
                      pipes,
                      pipes-safe,
                      pipes-parse,
-                     postgresql-simple,
                      text,
                      network < 2.6,
                      zeromq4-haskell,
