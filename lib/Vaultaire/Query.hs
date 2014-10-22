@@ -127,9 +127,9 @@ barrier = forever $ do
               EQ     -> yield x >> return p'
 
 -- | Align the first series to the times in the second series, e.g.
---   s1 = [     2     5 ]
+--   s1 = [     (2,a)     (5,b) ]
 --   s2 = [ 0 1 2   4 5 ]
---   result would be [ 0 1 2 4 5 ]
+--   result would be [ (0,a) (1,a) (2,a) (4,b) (5,b) ]
 --
 align :: Monad m
       => Query m SimplePoint

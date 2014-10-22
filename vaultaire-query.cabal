@@ -54,6 +54,35 @@ library
 
   ghc-prof-options:  -fprof-auto
 
+executable query
+  hs-source-dirs:    src
+  main-is:           Query.hs
+  default-language:  Haskell2010
+
+  build-depends:     base >=3 && <5,
+                     mtl,
+                     optparse-applicative >= 0.10,
+                     bytestring,
+                     network < 2.6,
+                     cassava,
+                     vector,
+                     either,
+                     pipes,
+                     pipes-bytestring,
+                     pipes-csv,
+                     pipes-safe,
+                     vaultaire-common,
+                     marquise,
+                     vaultaire-query
+
+  ghc-options:       -O2
+                     -threaded
+                     -Wall
+                     -Wwarn
+                     -fwarn-tabs
+
+  ghc-prof-options:  -fprof-auto
+
 test-suite           query-tests
   hs-source-dirs:    tests
   main-is:           Query.hs
