@@ -10,7 +10,7 @@
 
 import           Control.Applicative
 import           Control.Monad.Identity
-import           Control.Monad.State.Lazy
+import           Control.Monad.State.Strict
 import           Data.Function
 import           Data.List
 import qualified Data.Map as M
@@ -20,6 +20,7 @@ import           Data.Word
 import           Pipes
 import qualified Pipes.Prelude as P
 import           Test.Hspec
+import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 
 import           Vaultaire.Query
@@ -78,18 +79,6 @@ cumulTestExpected2 = 30
 cumulTestPoints3   = listToQuery (Address 42) 0 tenSec [40, 30, 20, 10]
 cumulTestExpected3 = 60
 
-main :: IO ()
-main = hspec $ do
-  describe "combinator: cacheQ" $
-    it "caches the results of a (key,val) query" $ property queryCache
-
-  describe "query: fit time series - given two time series, assign for every point in the first series a range from the second series such that the point can be linearly interpolated in that range" $
-    it "fits optimally" $ property fitOptimal
-  describe "aggregateCumulativePoints: correctly aggregates cumulative points" $ do
-    it "deals with multiple peaks" $ property testCumul1
-    it "deals with no peaks" $ property testCumul2
-    it "deals with constantly decreasing points" $ property testCumul3
-
 testCumul1, testCumul2, testCumul3 :: Bool
 testCumul1 = cumulTestExpected1 == runIdentity (aggregateCumulativePoints cumulTestPoints1)
 testCumul2 = cumulTestExpected2 == runIdentity (aggregateCumulativePoints cumulTestPoints2)
@@ -107,15 +96,41 @@ queryCache keys values =
 
 fitOptimal :: [SimplePoint] -> [SimplePoint] -> Property
 fitOptimal points other = (length points >= 2) && (length other >= 2) ==>
-  let fitted = P.toList $ enumerate $ fit (mkQuery points) (mkQuery other)
+  let fitted = P.toList $ enumerate $ fitSimple (mkQuery points) (mkQuery other)
   -- no one can do better!
   in  all (not . canFitBetter) fitted
-  where mkQuery :: [SimplePoint] -> Query Identity SimplePoint
-        mkQuery x = foreach (sortBy (compare `on` simpleTime) x)
-        narrowerRanges (x1, x2) = [ (t1, t2)
+  where narrowerRanges (x1, x2) = [ (t1, t2)
                                   | t1 <- other , t2 <- other
                                   ,  simpleTime t1 > simpleTime x1
                                   && simpleTime t2 < simpleTime x2 ]
         canFit x (t1, t2) =  simpleTime t1 <= simpleTime x
                           && simpleTime x <= simpleTime t2
         canFitBetter (range, x) = any (canFit x) $ narrowerRanges range
+        mkQuery x = foreach (sortBy (compare `on` simpleTime) x)
+
+
+filled :: [SimplePoint] -> [SimplePoint] -> Property
+filled points base = (length points > 0) ==>
+  let base'        = sortBy (compare `on` simpleTime) base
+      points'      = sortBy (compare `on` simpleTime) points
+      alignedTimes = P.toList $ enumerate (align (foreach points') (foreach base')) >-> P.map simpleTime
+      -- prune off the trailing part of the 2nd series
+      -- we can't interpolate more than one point off the tail of the first series
+      times        = filter (<= last alignedTimes) $ map simpleTime base'
+  in  all (flip elem alignedTimes) times
+
+main :: IO ()
+main = hspec $ modifyMaxSuccess (+1000) $ do
+  describe "combinator: cacheQ" $
+    it "caches the results of a (key,val) query" $ property queryCache
+
+  describe "query: fit time series - given two time series, assign for every point in the first series a range from the second series such that the point can be linearly interpolated in that range" $
+    it "fits optimally" $ property fitOptimal
+
+  describe "query: align time series" $
+    it "fills in the first series with time points from the second" $ property filled
+
+  describe "aggregateCumulativePoints: correctly aggregates cumulative points" $ do
+    it "deals with multiple peaks" $ property testCumul1
+    it "deals with no peaks" $ property testCumul2
+    it "deals with constantly decreasing points" $ property testCumul3

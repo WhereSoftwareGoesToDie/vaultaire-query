@@ -13,7 +13,8 @@ module Vaultaire.Query
          -- * Analytics Queries
        , addresses, addressesAny, addressesAll, addressesWith, metrics
        , eventMetrics, lookupQ, sumPoints
-       , fitWith , fit, aggregateCumulativePoints
+       , align
+       , fitWith , fitSimple, aggregateCumulativePoints
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
        )
@@ -48,7 +49,8 @@ import           Vaultaire.Query.Combinators
 import           Vaultaire.Query.Connection
 import           Vaultaire.Control.Lift
 
--- Combinators specific to vaultaire types -------------------------------------
+
+-- Ranges ----------------------------------------------------------------------
 
 spanPoints :: Monad m
            => ((b, b) -> a -> Bool)
@@ -61,8 +63,8 @@ spanPoints interpolateable r = view $ P.span (interpolateable r)
 
 inRange :: Monad m
         => ((b, b) -> a -> Bool)
-        -> Pipe (b, b)                    -- ^ range for which we will yield interpolateable times
-                ((b, b), a)               -- ^ range and a time from the underlying producer
+        -> Pipe (b, b)                     -- ^ range for which we will yield interpolateable times
+                ((b, b), a)                -- ^ range and a time from the underlying producer
                 (StateT (Producer a m ())  -- ^ the underlying producer of points
                         m)
                 ()
@@ -92,13 +94,50 @@ fitWith f points ranges = Select (enumerate (rangify ranges) >-> evalStateP (enu
         rangify series = [ (x,y) | x <- series
                                  | y <- Select $ enumerate series >-> P.drop 1 ]
 
-fit :: Monad m
-    => Query m SimplePoint
-    -> Query m SimplePoint
-    -> Query m ((SimplePoint, SimplePoint), SimplePoint)
-fit = fitWith interpolateable
+fitSimple :: Monad m
+          => Query m SimplePoint
+          -> Query m SimplePoint
+          -> Query m ((SimplePoint, SimplePoint), SimplePoint)
+fitSimple = fitWith interpolateable
   where interpolateable (p1, p2) p =  simpleTime p1 <= simpleTime p
                                    && simpleTime p  <= simpleTime p2
+
+
+-- Alignment -------------------------------------------------------------------
+
+barrier :: Monad m
+        => Pipe SimplePoint                         -- ^ pass these points along, this is the "tortoise"
+                SimplePoint                         -- ^ the above points, and additionally any points needed to align
+                (StateT (Producer SimplePoint m ()) -- ^ barriers, this is the "hare"
+                         m)
+                ()
+barrier = forever $ do
+  x         <- await
+  barriers  <- lift $ get
+  barriers' <- go x barriers
+  lift $ put barriers'
+  where go x p = do
+          b <- lift $ lift $ next p
+          case b of
+            Left   _ -> yield x >> return p
+            Right (y, p') -> case compare (simpleTime y) (simpleTime x) of
+              LT     -> yield (SimplePoint (simpleAddress x) (simpleTime y) (simplePayload x))
+                                >> go x p'
+              GT     -> yield x >> return p
+              EQ     -> yield x >> return p'
+
+-- | Align the first series to the times in the second series, e.g.
+--   s1 = [     2     5 ]
+--   s2 = [ 0 1 2   4 5 ]
+--   result would be [ 0 1 2 4 5 ]
+--
+align :: Monad m
+      => Query m SimplePoint
+      -> Query m SimplePoint
+      -> Query m SimplePoint
+align (Select s1) (Select s2) = Select $ s1 >-> evalStateP s2 barrier
+
+-- Aggregation -----------------------------------------------------------------
 
 -- | Sum the value (payload) of a series of simple data points.
 sumPoints :: Monad m => Query m SimplePoint -> Query m Word64
@@ -130,7 +169,8 @@ lookupQ :: Monad m
         -> Query m String -- ^ result as a query
 lookupQ s d = [ T.unpack x | x <- maybeQ $ lookupSource (T.pack s) d ]
 
--- Built-in Marquise Queries ---------------------------------------------------
+
+-- Primimtives -----------------------------------------------------------------
 
 -- | All addresses (and their metadata) from an origin.
 addresses :: MonadSafe m
