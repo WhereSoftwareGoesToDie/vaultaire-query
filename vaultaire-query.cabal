@@ -94,6 +94,7 @@ test-suite           query-tests
                      mtl,
                      pipes,
                      time,
+                     ieee754,
                      hspec,
                      QuickCheck,
                      vaultaire-common,

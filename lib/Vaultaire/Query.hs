@@ -49,7 +49,6 @@ import           Vaultaire.Query.Combinators
 import           Vaultaire.Query.Connection
 import           Vaultaire.Control.Lift
 
-
 -- Ranges ----------------------------------------------------------------------
 
 spanPoints :: Monad m
@@ -124,8 +123,8 @@ barrier = forever $ do
             Right (y, p') -> case compare (simpleTime y) (simpleTime x) of
               LT -> let val = case prev of
                           Nothing -> simplePayload x
-                          Just a  -> let val1  = fromIntegral $ simplePayload a
-                                         val2  = fromIntegral $ simplePayload x
+                          Just a  -> let val1  = simplePayload a
+                                         val2  = simplePayload x
                                          t1    = unTimeStamp $ simpleTime a
                                          t2    = unTimeStamp $ simpleTime x
                                          t     = unTimeStamp $ simpleTime y
