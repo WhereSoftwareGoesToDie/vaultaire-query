@@ -109,6 +109,7 @@ fitOptimal points other = (length points >= 2) && (length other >= 2) ==>
         mkQuery x = foreach (sortBy (compare `on` simpleTime) x)
 
 
+-- all missing times in the first seriers are filled in
 filled :: [SimplePoint] -> [SimplePoint] -> Property
 filled points base = (length points > 0) ==>
   let base'        = sortBy (compare `on` simpleTime) base
@@ -124,10 +125,10 @@ main = hspec $ modifyMaxSuccess (+1000) $ do
   describe "combinator: cacheQ" $
     it "caches the results of a (key,val) query" $ property queryCache
 
-  describe "query: fit time series - given two time series, assign for every point in the first series a range from the second series such that the point can be linearly interpolated in that range" $
+  describe "query: fitting time series - given two time series, assign for every point in the first series a range from the second series such that the point can be linearly interpolated in that range" $
     it "fits optimally" $ property fitOptimal
 
-  describe "query: align time series" $
+  describe "query: aligning time series" $ do
     it "fills in the first series with time points from the second" $ property filled
 
   describe "aggregateCumulativePoints: correctly aggregates cumulative points" $ do

@@ -106,25 +106,36 @@ fitSimple = fitWith interpolateable
 -- Alignment -------------------------------------------------------------------
 
 barrier :: Monad m
-        => Pipe SimplePoint                         -- ^ pass these points along, this is the "tortoise"
-                SimplePoint                         -- ^ the above points, and additionally any points needed to align
-                (StateT (Producer SimplePoint m ()) -- ^ barriers, this is the "hare"
-                         m)
+        => Pipe SimplePoint
+                SimplePoint
+                (StateT ( Maybe SimplePoint
+                        , Producer SimplePoint m ())
+                        m)
                 ()
 barrier = forever $ do
-  x         <- await
-  barriers  <- lift $ get
-  barriers' <- go x barriers
-  lift $ put barriers'
-  where go x p = do
-          b <- lift $ lift $ next p
+  x <- await
+  y <- lift $ get
+  z <- go x y
+  lift $ put z
+  where go x (prev, barriers) = do
+          b <- lift $ lift $ next barriers
           case b of
-            Left   _ -> yield x >> return p
+            Left   _ -> yield x >> return (Just x, barriers)
             Right (y, p') -> case compare (simpleTime y) (simpleTime x) of
-              LT     -> yield (SimplePoint (simpleAddress x) (simpleTime y) (simplePayload x))
-                                >> go x p'
-              GT     -> yield x >> return p
-              EQ     -> yield x >> return p'
+              LT -> let val = case prev of
+                          Nothing -> simplePayload x
+                          Just a  -> let val1  = fromIntegral $ simplePayload a
+                                         val2  = fromIntegral $ simplePayload x
+                                         t1    = unTimeStamp $ simpleTime a
+                                         t2    = unTimeStamp $ simpleTime x
+                                         t     = unTimeStamp $ simpleTime y
+                                     in  val1 + (((t - t1) `div` (t2 - t1)) * (val2 - val1))
+                        point = SimplePoint (simpleAddress x)
+                                            (simpleTime    y)
+                                             val
+                    in  yield point >> go x (prev, p')
+              GT -> yield x >> return (Just x, barriers)
+              EQ -> yield x >> return (Just x, barriers)
 
 -- | Align the first series to the times in the second series, e.g.
 --   s1 = [     (2,a)     (5,b) ]
@@ -135,7 +146,7 @@ align :: Monad m
       => Query m SimplePoint
       -> Query m SimplePoint
       -> Query m SimplePoint
-align (Select s1) (Select s2) = Select $ s1 >-> evalStateP s2 barrier
+align (Select s1) (Select s2) = Select $ s1 >-> evalStateP (Nothing, s2) barrier
 
 -- Aggregation -----------------------------------------------------------------
 

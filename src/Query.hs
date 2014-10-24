@@ -1,72 +1,45 @@
 {-# LANGUAGE DeriveGeneric, RecordWildCards, TupleSections #-}
 
-import Control.Monad.Except
-import Options.Applicative
-import Options.Applicative.Types
-import qualified Data.ByteString.Char8 as B
-import Network.URI
-import Text.Read
-import GHC.Generics
-import Data.Maybe
-import Data.Monoid
-import Data.Csv hiding (Parser)
-import qualified Data.Vector as V
-import Data.Either.Combinators
-import Pipes
-import Pipes.Safe
-import qualified Pipes.Prelude as P
-import qualified Pipes.Csv     as PC
+import           Control.Monad.Except
+import           Data.Either.Combinators
+import           Data.Monoid
+import           GHC.Generics
+import           Options.Applicative
+import           Options.Applicative.Types
+import           Pipes
 import qualified Pipes.ByteString as PS
+import qualified Pipes.Csv as PC
+import qualified Pipes.Prelude as P
+import           Pipes.Safe
 import qualified System.IO as IO
-import qualified Data.List as L
+import qualified Text.Parsec as P
+import qualified Text.Parsec.Error as P
 
-import Vaultaire.Query
-import Vaultaire.Types
-import Marquise.Types
+import           Vaultaire.Query
+import           Marquise.Types
+import           Parse
 
-
--- the opts parsers in here are buggy, should use "align" from vaultaire.query directly
-
-data Source
-   = File  FilePath
-   | Vault (URI,Origin,Address,TimeStamp,TimeStamp)
-   deriving (Read, Show)
-
-data Mode = Summation Source
-          | Align Source Source
+data Mode = Align Source Source
 
 data CmdArgs = CmdArgs { output :: FilePath, operation :: Mode }
      deriving Generic
 
-instance FromRecord SimplePoint where
-  parseRecord v
-    | V.length v == 3 = SimplePoint <$> v .! 0 <*> v.! 1 <*> v.! 2
-    | otherwise       = mzero
-
-instance FromField Address where
-  parseField = pure . read . B.unpack
-
-instance FromField TimeStamp where
-  parseField = pure . read . B.unpack
-
-instance PC.ToRecord SimplePoint where
-  toRecord (SimplePoint address timestamp payload) =
-    record [ B.pack $ show address
-           , B.pack $ show timestamp
-           , B.pack $ show payload ]
-
-fuckingReadIt :: Read a => ReadM a
-fuckingReadIt = readerAsk >>= return . read
-
-instance Read URI where
-  readsPrec _ = map (,"") . maybeToList . parseURI
-
 mode :: Parser Mode
 mode = subparser
      $ command "align" (info (helper <*> parse) (progDesc desc))
-  where parse = Align <$> option fuckingReadIt (long "source1")
-                      <*> option fuckingReadIt (long "source2")
+  where parse = Align <$> sauce <*> sauce
         desc  = "pad out the first series with times from the second"
+
+sauce :: Parser Source
+sauce = argument
+  (do s <- readerAsk
+      case P.parse pSource "" s of
+        Left e  -> readerError $ "Parsing source failed here: " ++ (showParserErrors
+                               $ P.errorMessages e)
+        Right x -> return x)
+  (help $ concat ["source for data points "
+                 ,"e.g. \"file:format=csv,path=foo.txt\" or "
+                 ,"vault:reader=tcp://foo.com:9999,origin=ABCDEF,address=7yHojf,start=2099-07-07,end=2100-12-22"])
 
 args :: Parser CmdArgs
 args =   CmdArgs
@@ -79,11 +52,12 @@ evalAlign sauce1 sauce2
   = return $ enumerate $ align (Select $ retrieve sauce1) (Select $ retrieve sauce2)
 
 retrieve :: MonadSafe m => Source -> Producer SimplePoint m ()
-retrieve (File p) = do
+retrieve (File _ p) = do
   h <- liftIO (IO.openFile p IO.ReadMode)
   PC.decode PC.NoHeader (PS.fromHandle h) >-> hush
   where hush = P.filter isRight >-> P.map fromRight'
-retrieve (Vault (uri, org, addr, start, end)) =
+
+retrieve (Vault uri org addr start end) =
   enumerate $ metrics uri org addr start end
 
 out :: FilePath -> Producer SimplePoint (SafeT IO) () -> IO ()
