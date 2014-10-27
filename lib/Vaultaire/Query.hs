@@ -119,7 +119,7 @@ barrier = forever $ do
   where go x (prev, barriers) = do
           b <- lift $ lift $ next barriers
           case b of
-            Left   _ -> yield x >> return (Just x, barriers)
+            Left   _      -> yield x >> return (Just x, barriers)
             Right (y, p') -> case compare (simpleTime y) (simpleTime x) of
               LT -> let val = case prev of
                           Nothing -> simplePayload x

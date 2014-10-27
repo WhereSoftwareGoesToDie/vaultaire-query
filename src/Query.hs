@@ -63,6 +63,7 @@ retrieve (Vault uri org addr start end) =
 out :: FilePath -> Producer SimplePoint (SafeT IO) () -> IO ()
 out f p = do
   h <- IO.openFile f IO.WriteMode
+  IO.hSetBuffering h IO.NoBuffering
   runSafeT $ runEffect $ p >-> PC.encode >-> PS.toHandle h
 
 main :: IO ()
