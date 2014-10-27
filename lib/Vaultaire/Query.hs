@@ -25,6 +25,7 @@ import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State.Strict
 import           Control.Lens (view)
 import           Data.Word
+import           Data.Binary.IEEE754
 import           Data.Either
 import qualified Data.Text                  as T
 import           Data.Text.Encoding         (encodeUtf8)
@@ -128,10 +129,10 @@ barrier = forever $ do
                                          t1    = wordToDouble $ unTimeStamp $ simpleTime a
                                          t2    = wordToDouble $ unTimeStamp $ simpleTime x
                                          t     = wordToDouble $ unTimeStamp $ simpleTime y
-                                     in  val1 + (((t - t1) / (t2 - t1)) * (val2 - val1))
+                                     in  doubleToWord $ val1 + (((t - t1) / (t2 - t1)) * (val2 - val1))
                         point = SimplePoint (simpleAddress x)
                                             (simpleTime    y)
-                                            (doubleToWord val)
+                                            val
                     in  yield point >> go x (prev, p')
               GT -> yield x >> return (Just x, barriers)
               EQ -> yield x >> return (Just x, barriers)

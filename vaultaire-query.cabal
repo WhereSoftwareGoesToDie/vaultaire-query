@@ -40,6 +40,7 @@ library
                      text,
                      network < 2.6,
                      zeromq4-haskell,
+                     data-binary-ieee754,
                      vaultaire-common,
                      vaultaire-control,
                      marquise,
@@ -72,6 +73,7 @@ executable query
                      pipes-bytestring,
                      pipes-csv,
                      pipes-safe,
+                     data-binary-ieee754,
                      vaultaire-common,
                      marquise,
                      vaultaire-query
