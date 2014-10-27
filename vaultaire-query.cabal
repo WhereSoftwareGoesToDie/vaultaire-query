@@ -43,7 +43,8 @@ library
                      zeromq4-haskell,
                      vaultaire-common,
                      vaultaire-control,
-                     marquise,
+                     -- FIXME: update for new marquise interface
+                     marquise >= 2.8 && < 3.0,
                      chevalier-common
 
   ghc-options:       -O2
