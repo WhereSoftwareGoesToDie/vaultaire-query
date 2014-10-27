@@ -123,15 +123,15 @@ barrier = forever $ do
             Right (y, p') -> case compare (simpleTime y) (simpleTime x) of
               LT -> let val = case prev of
                           Nothing -> simplePayload x
-                          Just a  -> let val1  = simplePayload a
-                                         val2  = simplePayload x
-                                         t1    = unTimeStamp $ simpleTime a
-                                         t2    = unTimeStamp $ simpleTime x
-                                         t     = unTimeStamp $ simpleTime y
-                                     in  val1 + (((t - t1) `div` (t2 - t1)) * (val2 - val1))
+                          Just a  -> let val1  = wordToDouble $ simplePayload a
+                                         val2  = wordToDouble $ simplePayload x
+                                         t1    = wordToDouble $ unTimeStamp $ simpleTime a
+                                         t2    = wordToDouble $ unTimeStamp $ simpleTime x
+                                         t     = wordToDouble $ unTimeStamp $ simpleTime y
+                                     in  val1 + (((t - t1) / (t2 - t1)) * (val2 - val1))
                         point = SimplePoint (simpleAddress x)
                                             (simpleTime    y)
-                                             val
+                                            (doubleToWord val)
                     in  yield point >> go x (prev, p')
               GT -> yield x >> return (Just x, barriers)
               EQ -> yield x >> return (Just x, barriers)
