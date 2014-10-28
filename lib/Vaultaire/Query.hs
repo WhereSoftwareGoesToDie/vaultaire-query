@@ -11,11 +11,13 @@ module Vaultaire.Query
        , module Vaultaire.Query.Combinators
        , module Vaultaire.Query.Connection
          -- * Analytics Queries
-       , addresses, addressesAny, addressesAll, addressesWith, metrics
-       , eventMetrics, lookupQ, sumPoints
+       , addresses, addressesAny, addressesAll, addressesWith
+       , metrics, eventMetrics, lookupQ, sumPoints
        , fitWith , fit, aggregateCumulativePoints
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
+         -- * Low-level operations
+       , readSimplePoints, enumerateOrigin
        )
 where
 
@@ -139,7 +141,7 @@ addresses :: (MonadLogger m, MonadSafe m)
           => URI
           -> Origin
           -> Query m (Address, SourceDict) -- ^ result address and its metadata map
-addresses uri origin = Select $ enumerateOrigin uri origin
+addresses uri origin = Select $ enumerateOrigin M.NoRetry uri origin
 
 -- | Addresses whose metadata match (fuzzily) any in a set of metadata key-values.
 --   e.g. @addressesAny origin [("nginx", "error-rates"), ("metric", "cpu")]@
@@ -175,7 +177,7 @@ metrics :: (MonadSafe m, MonadLogger m)
         -> TimeStamp           -- ^ end
         -> Query m SimplePoint -- ^ result data point
 metrics uri origin addr start end
-  = Select $ readSimple uri addr start end origin
+  = Select $ readSimplePoints M.NoRetry uri addr start end origin
 
 -- | To construct event based data correctly we need to query over all time
 eventMetrics :: (MonadLogger m, MonadSafe m)
@@ -186,27 +188,27 @@ eventMetrics :: (MonadLogger m, MonadSafe m)
 eventMetrics uri origin addr = Select $ do
   let start = TimeStamp 0
   end <- liftIO getCurrentTimeNanoseconds
-  readSimple uri addr start end origin
+  readSimplePoints M.NoRetry uri addr start end origin
 
--- | Read simple points from Marquise and log any error, don't fail
-readSimple :: (MonadLogger m, MonadSafe m)
-           => URI
-           -> Address -> TimeStamp -> TimeStamp -> Origin
+-- Raw Marquise queries -------------------------------------------------------
+
+readSimplePoints :: (MonadLogger m, MonadSafe m)
+           => M.Policy
+           -> URI -> Address -> TimeStamp -> TimeStamp -> Origin
            -> Producer SimplePoint m ()
-readSimple uri a s e o = runMarquiseReader uri $ do
+readSimplePoints pol uri a s e o = runMarquiseReader uri $ do
   (MarquiseReader c) <- lift ask
-  hoist liftIO $  catchMarquiseAll (M.readSimplePoints M.NoRetry a s e o c)
+  hoist liftIO $  catchMarquiseAll (M.readSimplePoints pol a s e o c)
                                    (\x -> lift $ M.logError $ show x)
                >> return ()
 
--- | Enumerate origins from Marquise and log any error, don't fail
 enumerateOrigin :: (MonadLogger m, MonadSafe m)
-                => URI
-                -> Origin
+                => M.Policy
+                -> URI -> Origin
                 -> Producer (Address, SourceDict) m ()
-enumerateOrigin uri o = runMarquiseContents uri $ do
+enumerateOrigin pol uri o = runMarquiseContents uri $ do
   (MarquiseContents c) <- liftT ask
-  hoist liftIO $  catchMarquiseAll (M.enumerateOrigin M.NoRetry o c)
+  hoist liftIO $  catchMarquiseAll (M.enumerateOrigin pol o c)
                                    (\e -> lift $ M.logError $ show e)
                >> return ()
 
