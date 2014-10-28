@@ -43,7 +43,7 @@ library
                      data-binary-ieee754,
                      vaultaire-common,
                      vaultaire-control,
-                     marquise,
+                     marquise < 3.0.0,
                      chevalier-common
 
   ghc-options:       -O2
@@ -62,7 +62,7 @@ executable query
 
   build-depends:     base >=3 && <5,
                      mtl,
-                     optparse-applicative >= 0.11,
+                     optparse-applicative,
                      bytestring,
                      network < 2.6,
                      cassava,
@@ -75,7 +75,7 @@ executable query
                      pipes-safe,
                      data-binary-ieee754,
                      vaultaire-common,
-                     marquise,
+                     marquise < 3.0.0,
                      vaultaire-query
 
   ghc-options:       -O2

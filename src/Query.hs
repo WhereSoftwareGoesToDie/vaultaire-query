@@ -3,6 +3,7 @@
 import           Control.Monad.Except
 import           Data.Either.Combinators
 import           Data.Monoid
+import qualified Data.ByteString.Char8 as B8
 import           GHC.Generics
 import           Options.Applicative
 import           Options.Applicative.Types
@@ -16,6 +17,7 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as P
 
 import           Vaultaire.Query
+import           Vaultaire.Types
 import           Marquise.Types
 import           Parse
 
@@ -48,17 +50,23 @@ args =   CmdArgs
      <*> mode
 
 evalAlign :: Source -> Source -> IO (Producer SimplePoint (SafeT IO) ())
-evalAlign sauce1 sauce2
-  = return $ enumerate $ align (Select $ retrieve sauce1) (Select $ retrieve sauce2)
+evalAlign sauce1 sauce2 = do
+  (sd, s1) <- msnd Select <$> retrieve sauce1
+  (_,  s2) <- msnd Select <$> retrieve sauce2
+  return $ enumerate $ align (sd, s1) s2
+  where msnd f (x,y) = (x, f y)
 
-retrieve :: MonadSafe m => Source -> Producer SimplePoint m ()
-retrieve (File _ p) = do
-  h <- liftIO (IO.openFile p IO.ReadMode)
-  PC.decode PC.NoHeader (PS.fromHandle h) >-> hush
+retrieve :: MonadSafe m => Source -> IO (SourceDict, Producer SimplePoint m ())
+retrieve (File _ p sd) = do
+  dict <- liftIO $ IO.readFile sd
+  h    <- liftIO $ IO.openFile p IO.ReadMode
+  return $ ( fromRight mempty $ fromWire $ B8.pack dict
+           , PC.decode PC.NoHeader (PS.fromHandle h) >-> hush)
   where hush = P.filter isRight >-> P.map fromRight'
 
+-- TODO get the sourcedict for this address, maybe via chevalier
 retrieve (Vault uri org addr start end) =
-  enumerate $ metrics uri org addr start end
+  return $ (mempty, enumerate $ metrics uri org addr start end)
 
 out :: FilePath -> Producer SimplePoint (SafeT IO) () -> IO ()
 out f p = do
