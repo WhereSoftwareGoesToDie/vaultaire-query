@@ -22,7 +22,6 @@ module Vaultaire.Query
 where
 
 import           Control.Monad
-import           Control.Monad.Logger
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State.Strict
 import           Control.Lens (view)
@@ -137,7 +136,7 @@ lookupQ s d = [ T.unpack x | x <- maybeQ $ lookupSource (T.pack s) d ]
 -- Built-in Marquise Queries ---------------------------------------------------
 
 -- | All addresses (and their metadata) from an origin.
-addresses :: (MonadLogger m, MonadSafe m)
+addresses :: (MonadIO m, MonadSafe m)
           => URI
           -> Origin
           -> Query m (Address, SourceDict) -- ^ result address and its metadata map
@@ -145,7 +144,7 @@ addresses uri origin = Select $ enumerateOrigin M.NoRetry uri origin
 
 -- | Addresses whose metadata match (fuzzily) any in a set of metadata key-values.
 --   e.g. @addressesAny origin [("nginx", "error-rates"), ("metric", "cpu")]@
-addressesAny :: (MonadLogger m, MonadSafe m)
+addressesAny :: (MonadIO m, MonadSafe m)
              => URI
              -> Origin
              -> [(String, String)]            -- ^ metadata key-value constraints (fuzzy on values)
@@ -157,7 +156,7 @@ addressesAny uri origin mds
    ]
 
 -- | Addresses whose metadata match (fuzzily) all in a set of metadata key-values.
-addressesAll :: (MonadLogger m, MonadSafe m)
+addressesAll :: (MonadIO m, MonadSafe m)
              => URI
              -> Origin
              -> [(String, String)]            -- ^ metadata key-value constraints (fuzzy on values)
@@ -169,7 +168,7 @@ addressesAll uri origin mds
    ]
 
 -- | Data points for an address over some period of time.
-metrics :: (MonadSafe m, MonadLogger m)
+metrics :: (MonadSafe m, MonadIO m)
         => URI
         -> Origin
         -> Address
@@ -180,7 +179,7 @@ metrics uri origin addr start end
   = Select $ readSimplePoints M.NoRetry uri addr start end origin
 
 -- | To construct event based data correctly we need to query over all time
-eventMetrics :: (MonadLogger m, MonadSafe m)
+eventMetrics :: (MonadIO m, MonadSafe m)
              => URI
              -> Origin
              -> Address
@@ -192,7 +191,7 @@ eventMetrics uri origin addr = Select $ do
 
 -- Raw Marquise queries -------------------------------------------------------
 
-readSimplePoints :: (MonadLogger m, MonadSafe m)
+readSimplePoints :: (MonadIO m, MonadSafe m)
            => M.Policy
            -> URI -> Address -> TimeStamp -> TimeStamp -> Origin
            -> Producer SimplePoint m ()
@@ -202,7 +201,7 @@ readSimplePoints pol uri a s e o = runMarquiseReader uri $ do
                                    (\x -> lift $ M.logError $ show x)
                >> return ()
 
-enumerateOrigin :: (MonadLogger m, MonadSafe m)
+enumerateOrigin :: (MonadIO m, MonadSafe m)
                 => M.Policy
                 -> URI -> Origin
                 -> Producer (Address, SourceDict) m ()
