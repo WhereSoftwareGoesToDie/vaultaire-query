@@ -66,6 +66,8 @@ executable query
                      optparse-applicative,
                      bytestring,
                      network < 2.6,
+                     directory,
+                     filepath,
                      cassava,
                      vector,
                      either,
@@ -76,6 +78,7 @@ executable query
                      pipes-safe,
                      data-binary-ieee754,
                      vaultaire-common,
+                     chevalier-common,
                      marquise >= 3.1.0,
                      vaultaire-query
 

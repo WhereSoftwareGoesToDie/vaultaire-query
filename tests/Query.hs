@@ -148,7 +148,7 @@ lerp s1 s2 =
         trip (x,y) z = (x,y,z)
 
 main :: IO ()
-main = hspec $ modifyMaxSuccess (+1000) $ do
+main = hspec $ modifyMaxSuccess (+10000) $ do
   describe "combinator: cacheQ" $
     it "caches the results of a (key,val) query" $ property queryCache
 

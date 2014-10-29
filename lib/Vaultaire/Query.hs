@@ -10,6 +10,8 @@ module Vaultaire.Query
        ( Query
        , module Vaultaire.Query.Combinators
        , module Vaultaire.Query.Connection
+       , M.Policy(..)
+       , M.SimplePoint
          -- * Analytics Queries
        , addresses, addressesAny, addressesAll, addressesWith
        , metrics, eventMetrics, lookupQ, sumPoints
