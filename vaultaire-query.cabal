@@ -44,7 +44,7 @@ library
                      data-binary-ieee754,
                      vaultaire-common,
                      vaultaire-control,
-                     marquise < 3.0.0,
+                     marquise >= 3.1.0,
                      chevalier-common
 
   ghc-options:       -O2
@@ -76,7 +76,7 @@ executable query
                      pipes-safe,
                      data-binary-ieee754,
                      vaultaire-common,
-                     marquise < 3.0.0,
+                     marquise >= 3.1.0,
                      vaultaire-query
 
   ghc-options:       -O2

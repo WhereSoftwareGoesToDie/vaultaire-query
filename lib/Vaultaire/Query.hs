@@ -13,7 +13,7 @@ module Vaultaire.Query
          -- * Analytics Queries
        , addresses, addressesAny, addressesAll, addressesWith
        , metrics, eventMetrics, lookupQ, sumPoints
-       , fitWith , fit, aggregateCumulativePoints
+       , fitWith , fitSimple, aggregateCumulativePoints
        , align
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
