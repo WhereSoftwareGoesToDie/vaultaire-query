@@ -17,6 +17,7 @@ import qualified Data.Map as M
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Word
+import           Data.Monoid
 import           Pipes
 import qualified Pipes.Prelude as P
 import           Test.Hspec
@@ -114,11 +115,37 @@ filled :: [SimplePoint] -> [SimplePoint] -> Property
 filled points base = (length points > 0) ==>
   let base'        = sortBy (compare `on` simpleTime) base
       points'      = sortBy (compare `on` simpleTime) points
-      alignedTimes = P.toList $ enumerate (align (foreach points') (foreach base')) >-> P.map simpleTime
+      alignedTimes = P.toList $ enumerate (align (mempty, foreach points') (foreach base')) >-> P.map simpleTime
       -- prune off the trailing part of the 2nd series
       -- we can't interpolate more than one point off the tail of the first series
       times        = filter (<= last alignedTimes) $ map simpleTime base'
   in  all (flip elem alignedTimes) times
+
+lerp :: [SimplePoint] -> [SimplePoint] -> Bool
+lerp s1 s2 =
+  let t1 = map simpleTime s1
+      t2 = map simpleTime s2
+      s  = P.toList $ enumerate $ align (mempty, foreach s1) (foreach s2)
+      -- mark interpolated points
+      s' = map (\x -> let t = simpleTime x in
+                      if  t `elem` t2 && not (t `elem` t1)
+                      then (x, True)
+                      else (x, False)) s
+      -- determine the least/most upper/lower bound for x: (lower,x,upper)
+      r  = zipWith trip (zip (drop 2 s') s') $ take (length s' - 2) s'
+  in  all (\((l,_),(x,a),(u,_)) -> if a then interp l x u else True) r
+  where -- assume integer interpolation, as we didn't specify "_float=1"
+        interp l x u = let v1 = simplePayload l
+                           v2 = simplePayload u
+                           v  = simplePayload x
+                           t1 = unTimeStamp $ simpleTime    l
+                           t2 = unTimeStamp $ simpleTime    u
+                           t  = unTimeStamp $ simpleTime    x
+                           val = if t2 == t1
+                                 then v1
+                                 else v1 + ((t - t1) `div` (t2 - t1)) * (v2 - v1)
+                       in  v == val
+        trip (x,y) z = (x,y,z)
 
 main :: IO ()
 main = hspec $ modifyMaxSuccess (+1000) $ do
@@ -128,8 +155,9 @@ main = hspec $ modifyMaxSuccess (+1000) $ do
   describe "query: fitting time series - given two time series, assign for every point in the first series a range from the second series such that the point can be linearly interpolated in that range" $
     it "fits optimally" $ property fitOptimal
 
-  describe "query: aligning time series" $ do
-    it "fills in the first series with time points from the second" $ property filled
+  describe "query: aligning discrete time series" $ do
+    it "fills in the first series with times from the second that are not in the first" $ property filled
+    it "linearly interpolates the missing values" $ property lerp
 
   describe "aggregateCumulativePoints: correctly aggregates cumulative points" $ do
     it "deals with multiple peaks" $ property testCumul1
