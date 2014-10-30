@@ -36,6 +36,6 @@ install:
 
 script:
   - 'cabal-$CABALVER configure --enable-tests'
-  - 'cabal-$CABALVER install'
+  - 'cabal-$CABALVER build'
   - 'cabal-$CABALVER sdist'
   - 'cabal-$CABALVER test'

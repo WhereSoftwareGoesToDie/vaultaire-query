@@ -10,13 +10,10 @@ module Vaultaire.Query
        ( Query
        , module Vaultaire.Query.Combinators
        , module Vaultaire.Query.Connection
-       , M.Policy(..)
-       , M.SimplePoint
          -- * Analytics Queries
        , addresses, addressesAny, addressesAll, addressesWith
        , metrics, eventMetrics, lookupQ, sumPoints
-       , fitWith , fitSimple, aggregateCumulativePoints
-       , align
+       , fitWith , fit, aggregateCumulativePoints
          -- * Helpful Predicates for Transforming Queries
        , fuzzy, fuzzyAny, fuzzyAll
          -- * Low-level operations
@@ -29,7 +26,6 @@ import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State.Strict
 import           Control.Lens (view)
 import           Data.Word
-import           Data.Binary.IEEE754
 import           Data.Either
 import qualified Data.Text                  as T
 import           Data.Text.Encoding         (encodeUtf8)
@@ -55,7 +51,7 @@ import           Vaultaire.Query.Combinators
 import           Vaultaire.Query.Connection
 import           Vaultaire.Control.Lift
 
--- Ranges ----------------------------------------------------------------------
+-- Combinators specific to vaultaire types -------------------------------------
 
 spanPoints :: Monad m
            => ((b, b) -> a -> Bool)
@@ -68,8 +64,8 @@ spanPoints interpolateable r = view $ P.span (interpolateable r)
 
 inRange :: Monad m
         => ((b, b) -> a -> Bool)
-        -> Pipe (b, b)                     -- ^ range for which we will yield interpolateable times
-                ((b, b), a)                -- ^ range and a time from the underlying producer
+        -> Pipe (b, b)                    -- ^ range for which we will yield interpolateable times
+                ((b, b), a)               -- ^ range and a time from the underlying producer
                 (StateT (Producer a m ())  -- ^ the underlying producer of points
                         m)
                 ()
@@ -99,70 +95,13 @@ fitWith f points ranges = Select (enumerate (rangify ranges) >-> evalStateP (enu
         rangify series = [ (x,y) | x <- series
                                  | y <- Select $ enumerate series >-> P.drop 1 ]
 
-fitSimple :: Monad m
-          => Query m SimplePoint
-          -> Query m SimplePoint
-          -> Query m ((SimplePoint, SimplePoint), SimplePoint)
-fitSimple = fitWith interpolateable
+fit :: Monad m
+    => Query m SimplePoint
+    -> Query m SimplePoint
+    -> Query m ((SimplePoint, SimplePoint), SimplePoint)
+fit = fitWith interpolateable
   where interpolateable (p1, p2) p =  simpleTime p1 <= simpleTime p
                                    && simpleTime p  <= simpleTime p2
-
-
--- Alignment -------------------------------------------------------------------
-
-barrier :: Monad m
-        => (SimplePoint -> SimplePoint -> TimeStamp -> SimplePoint) -- ^ interpolation function
-        -> Pipe SimplePoint
-                SimplePoint
-                (StateT ( Maybe SimplePoint
-                        , Producer SimplePoint m ())
-                        m)
-                ()
-barrier interp = forever $ do
-  x <- await
-  y <- lift $ get
-  z <- go x y
-  lift $ put z
-  where go x (prev, barriers) = do
-          lift (lift $ next barriers) >>= \b -> case b of
-            -- no more times to interpolate, yield the rest of the series
-            Left   _      -> yield x >> return (Just x, barriers)
-            Right (y, p') -> case compare (simpleTime y) (simpleTime x) of
-              -- missing some times, interpolate
-              LT -> let prev'        = maybe x id prev
-                        interpolated = interp prev' x (simpleTime y)
-                    in  yield interpolated >> go x (prev, p')
-              -- not missing these times
-              GT -> yield x >> return (Just x, barriers)
-              EQ -> yield x >> return (Just x, barriers)
-
--- | Align the first series to the times in the second series, e.g.
---   s1 = [     (2,a)     (5,b) ]
---   s2 = [ 0 1 2   4 5 ]
---   result would be [ (0,a) (1,a) (2,a) (4,b) (5,b) ]
---
-align :: Monad m
-      => (SourceDict, Query m SimplePoint) -- interpolate this series
-      ->              Query m SimplePoint  -- with times from this one
-      ->              Query m SimplePoint
-align (sd, Select s1) (Select s2)
-  = Select $ s1 >-> evalStateP (Nothing, s2) (barrier fun)
-
-  where interpolate decode encode division x1 x2 t
-          | simpleTime x1 == simpleTime x2 = SimplePoint (simpleAddress x1) t (simplePayload x1)
-          | otherwise = let val1  = decode $ simplePayload x1
-                            val2  = decode $ simplePayload x2
-                            t1    = decode $ unTimeStamp $ simpleTime x1
-                            t2    = decode $ unTimeStamp $ simpleTime x2
-                            t'    = decode $ unTimeStamp t
-                            val   = encode $ val1 + ((division (t' - t1) (t2 - t1) ) * (val2 - val1))
-                        in  SimplePoint (simpleAddress x1) t val
-
-        fun = case fmap T.unpack (lookupSource (T.pack "_float") sd) of
-          Just "1" -> interpolate wordToDouble doubleToWord (/)
-          _        -> interpolate fromIntegral id           div
-
--- Aggregation -----------------------------------------------------------------
 
 -- | Sum the value (payload) of a series of simple data points.
 sumPoints :: Monad m => Query m SimplePoint -> Query m Word64
@@ -194,8 +133,7 @@ lookupQ :: Monad m
         -> Query m String -- ^ result as a query
 lookupQ s d = [ T.unpack x | x <- maybeQ $ lookupSource (T.pack s) d ]
 
-
--- Primimtives -----------------------------------------------------------------
+-- Built-in Marquise Queries ---------------------------------------------------
 
 -- | All addresses (and their metadata) from an origin.
 addresses :: (MonadIO m, MonadSafe m)
