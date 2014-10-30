@@ -12,11 +12,13 @@
 module Vaultaire.Query.Connection
        ( MarquiseReader(..), runMarquiseReader
        , MarquiseContents(..), runMarquiseContents
-       , Chevalier(..), runChevalier )
+       , Chevalier(..), runChevalier
+       , Postgres(..), runPostgres )
 
 where
 
 import           Control.Monad.Trans.Reader
+import qualified Database.PostgreSQL.Simple as PG
 import           Network.URI
 import           Pipes
 import           Pipes.Safe (MonadSafe)
@@ -30,6 +32,7 @@ import           Vaultaire.Query.Base
 newtype Chevalier        = Chevalier        (Z.Socket Z.Req)
 newtype MarquiseReader   = MarquiseReader   SocketState
 newtype MarquiseContents = MarquiseContents SocketState
+newtype Postgres         = Postgres PG.Connection
 
 -- | Runs the Chevalier daemon in our query environment stack.
 runChevalier :: (MonadSafe m)
@@ -66,3 +69,12 @@ runMarquise uri mkconn p =
   P.bracket (liftIO $ Z.socket ctx Z.Dealer)     (liftIO . Z.close)  $ \sock ->
   P.bracket (liftIO $ Z.connect sock $ show uri) (const $ return ()) $ \_    ->
     P.runReaderP (mkconn $ SocketState sock $ show uri) p
+
+-- | Runs the Postgres connection in our query environment stack.
+runPostgres :: (MonadSafe m)
+            => PG.ConnectInfo
+            -> Query (ReaderT Postgres m) x
+            -> Query m x
+runPostgres pginfo (Select act) = Select $
+  P.bracket (liftIO $ PG.connect pginfo) (liftIO . PG.close) $ \c ->
+            P.runReaderP (Postgres c) act
