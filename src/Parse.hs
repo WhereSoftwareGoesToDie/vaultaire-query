@@ -49,7 +49,7 @@ pSource = pFile <|> pVault
         pFile = do
           try $ string "file:"
           f  <- string "format="  >> pTillSep >>= pRead "unrecognised format" . map toUpper
-          p  <- string "points="  >> pTillSep >>= pRead "can't parse filepath"
+          p  <- string "points="  >> pTillSep
           d  <- string "dict="    >> pTillEOF
           return $ File f p d
         pVault = do
