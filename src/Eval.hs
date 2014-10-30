@@ -35,7 +35,6 @@ evalExport :: Policy -> FilePath
 evalExport pol outdir u org start end = do
   runSafeT $ runEffect
            $ enumerateOrigin pol u org >-> fetchAddress
-  undefined
   where fetchAddress = forever $ do
           (addr, sd) <- await
           let addrdir = concat [outdir, "/", show addr, escape $ B8.unpack $ toWire sd]
