@@ -155,7 +155,8 @@ align (sd, Select s1) (Select s2)
                             t1    = decode $ unTimeStamp $ simpleTime x1
                             t2    = decode $ unTimeStamp $ simpleTime x2
                             t'    = decode $ unTimeStamp t
-                            val   = encode $ val1 + ((division (t' - t1) (t2 - t1) ) * (val2 - val1))
+                            alpha = division (t' - t1) (t2 - t1)
+                            val   = encode $ val1 + alpha*val2 - alpha*val1
                         in  SimplePoint (simpleAddress x1) t val
 
         fun = case fmap T.unpack (lookupSource (T.pack "_float") sd) of
