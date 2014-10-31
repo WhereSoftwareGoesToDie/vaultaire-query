@@ -16,6 +16,7 @@ import           Pipes.Safe
 import qualified System.IO as IO
 import           System.Directory
 import           System.FilePath
+import           System.Log.Logger
 
 import           Vaultaire.Query
 import           Vaultaire.Types
@@ -42,7 +43,7 @@ evalExport pol outdir u org start end = do
           h <- liftIO $ do
                 createDirectoryIfMissing False addrdir
                 B8.appendFile (addrdir ++ "/sd") (toWire sd)
-                logInfo $ "Reading points from address " ++ show addr
+                infoM "Query.Export" $ "Reading points from address " ++ show addr
                 IO.openFile pfile IO.WriteMode
           runEffect $   readSimplePoints pol u addr start end org
                     >-> PC.encode
@@ -67,7 +68,3 @@ out f p = do
   h <- IO.openFile f IO.WriteMode
   IO.hSetBuffering h IO.NoBuffering
   runSafeT $ runEffect $ p >-> PC.encode >-> PB.toHandle h
-
--- TODO add logging to this CLI tool
-logInfo :: String -> IO ()
-logInfo = putStrLn

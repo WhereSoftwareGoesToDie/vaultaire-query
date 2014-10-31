@@ -47,13 +47,13 @@ pSource :: Parser Source
 pSource = pFile <|> pVault
   where pFile, pVault :: Parser Source
         pFile = do
-          try $ string "file:"
+          _  <- try $ string "file:"
           f  <- string "format="  >> pTillSep >>= pRead "unrecognised format" . map toUpper
           p  <- string "points="  >> pTillSep
           d  <- string "dict="    >> pTillEOF
           return $ File f p d
         pVault = do
-          try $ string "vault:"
+          _  <- try $ string "vault:"
           x  <- string "reader="  >> pTillSep
           u  <- maybe (unexpected "can't parse reader URI") return (parseURI x)
           o  <- string "origin="  >> pTillSep >>= pRead "can't parse origin"

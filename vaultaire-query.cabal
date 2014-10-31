@@ -76,6 +76,7 @@ executable query
                      pipes-bytestring,
                      pipes-csv,
                      pipes-safe,
+                     hslogger,
                      data-binary-ieee754,
                      vaultaire-common,
                      chevalier-common,
