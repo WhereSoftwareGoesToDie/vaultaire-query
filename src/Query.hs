@@ -18,6 +18,7 @@ import           Eval
 data Mode
   = Align  Source Source
   | Export URI Origin TimeStamp TimeStamp
+  | Fetch  (String, String) URI Origin TimeStamp TimeStamp
 
 data CmdArgs
   = CmdArgs { output    :: FilePath
@@ -44,17 +45,31 @@ mode = subparser
              )
         )
      )
+  <> (command "fetch"
+       (info pFetch
+             (progDesc $ concat
+               ["fetch data for a metric matching some (key,value), e.g."
+               ," fetch hostname=deadbeef tcp://foo.com:9999 ABCDEF"]
+             )
+       )
+     )
   )
-  where pAlign  = Align  <$> sauce <*> sauce
-        pExport = Export <$> uri   <*> origin <*> timestamp <*> timestamp
-        sauce = argument
-          (do s <- readerAsk
-              case P.parse pSource "" s of
-                Left e  -> readerError $ "Parsing source failed here: " ++ (showParserErrors
-                                       $ P.errorMessages e)
-                Right x -> return x)
-          mempty
-        uri       = argument (readerAsk>>= maybe (readerError "cannot parse broker URI") return . parseURI) mempty
+  where pAlign  = Align  <$> sauce  <*> sauce
+        pExport = Export <$> uri    <*> origin <*> timestamp <*> timestamp
+        pFetch  = Fetch  <$> keyval <*> uri    <*> origin    <*> timestamp <*> timestamp
+        sauce = flip argument mempty $
+          do s <- readerAsk
+             case P.parse pSource "" s of
+               Left e  -> readerError $  "Parsing source failed here: "
+                                      ++ (showParserErrors $ P.errorMessages e)
+               Right x -> return x
+        keyval = flip argument mempty $
+          do s <- readerAsk
+             case P.parse pKeyVal "" s of
+               Left e  -> readerError $  "Parsing keyval failed: "
+                                      ++ (showParserErrors $ P.errorMessages e)
+               Right x -> return x
+        uri       = argument (readerAsk >>= maybe (readerError "cannot parse broker URI") return . parseURI) mempty
         origin    = argument (readerAsk >>= maybe (readerError "cannot parse origin") return . readMaybe) mempty
         timestamp = argument (readerAsk >>= maybe (readerError "cannot read timestamp") return . readMaybe) mempty
 
@@ -80,5 +95,7 @@ main = do
     Align sauce1 sauce2 -> evalAlign retry output sauce1 sauce2
     Export u org s e    -> createDirectoryIfMissing True output
                         >> evalExport retry output u org s e
+    Fetch q u org s e   -> createDirectoryIfMissing True output
+                        >> evalFetch retry output q u org s e
 
   where toplevel = info (helper <*> args) (fullDesc <> header "Simple query CLI")

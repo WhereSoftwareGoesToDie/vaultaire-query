@@ -2,7 +2,7 @@
 
 module Parse
       ( Source(..), Format(..)
-      , pSource, showParserErrors)
+      , pSource, pKeyVal, showParserErrors)
 where
 
 import           Control.Applicative hiding ((<|>))
@@ -30,8 +30,8 @@ data Source
 data Format = CSV
      deriving Read
 
-pTillSep :: Parser String
-pTillSep = manyTill anyChar (try (string ","))
+pTillSep :: String -> Parser String
+pTillSep s = manyTill anyChar (try (string s))
 
 pTillEOF :: Parser String
 pTillEOF = manyTill anyChar (try eof)
@@ -48,19 +48,22 @@ pSource = pFile <|> pVault
   where pFile, pVault :: Parser Source
         pFile = do
           _  <- try $ string "file:"
-          f  <- string "format="  >> pTillSep >>= pRead "unrecognised format" . map toUpper
-          p  <- string "points="  >> pTillSep
+          f  <- string "format="  >> pTillSep "," >>= pRead "unrecognised format" . map toUpper
+          p  <- string "points="  >> pTillSep ","
           d  <- string "dict="    >> pTillEOF
           return $ File f p d
         pVault = do
           _  <- try $ string "vault:"
-          x  <- string "reader="  >> pTillSep
+          x  <- string "reader="  >> pTillSep ","
           u  <- maybe (unexpected "can't parse reader URI") return (parseURI x)
-          o  <- string "origin="  >> pTillSep >>= pRead "can't parse origin"
-          a  <- string "address=" >> pTillSep >>= pRead "can't parse address"
-          s  <- string "start="   >> pTillSep >>= pRead "can't parse timestamp"
-          e  <- string "end="     >> pTillEOF >>= pRead "can't parse timestamp"
+          o  <- string "origin="  >> pTillSep "," >>= pRead "can't parse origin"
+          a  <- string "address=" >> pTillSep "," >>= pRead "can't parse address"
+          s  <- string "start="   >> pTillSep "," >>= pRead "can't parse timestamp"
+          e  <- string "end="     >> pTillEOF     >>= pRead "can't parse timestamp"
           return $ Vault u o a s e
+
+pKeyVal :: Parser (String, String)
+pKeyVal = (,) <$> pTillSep "=" <*> pTillEOF
 
 showParserErrors :: [Message] -> String
 showParserErrors = showErrorMessages "" "Unknown" "Expecting" "Unexpected" "EOF"

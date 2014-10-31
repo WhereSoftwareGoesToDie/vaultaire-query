@@ -51,6 +51,20 @@ evalExport pol outdir u org start end = do
           liftIO $ IO.hClose h
         escape = map (\c -> if isPathSeparator c then '_' else c)
 
+evalFetch :: Policy -> FilePath
+           -> (String, String) -> URI -> Origin -> TimeStamp -> TimeStamp -> IO ()
+evalFetch pol outdir (key,val) u org start end = do
+  let pf =  concat [outdir, "/", "points"]
+  let df =  concat [outdir, "/", "sd"]
+  ph     <- IO.openFile df IO.WriteMode
+  addrs  <- getAddresses org (key,val)
+  runSafeT $ runEffect
+           $ for (each addrs)
+                  (\(a,d) -> do liftIO $ B8.writeFile pf $ toWire d
+                                readSimplePoints pol u a start end org)
+           >-> PC.encode
+           >-> PB.toHandle ph
+
 retrieve :: MonadSafe m => Policy -> Source -> IO (SourceDict, Producer SimplePoint m ())
 retrieve _ (File _ p sd) = do
   dict <- liftIO $ IO.readFile sd
