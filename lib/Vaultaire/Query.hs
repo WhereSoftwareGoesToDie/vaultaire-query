@@ -4,6 +4,7 @@
   , ParallelListComp
   , MonadComprehensions
   , TupleSections
+  , RankNTypes
   #-}
 -- | Analytics queries on Vaultaire data.
 module Vaultaire.Query
@@ -110,31 +111,27 @@ fitSimple = fitWith interpolateable
 
 -- Alignment -------------------------------------------------------------------
 
-barrier :: Monad m
-        => (SimplePoint -> SimplePoint -> TimeStamp -> SimplePoint) -- ^ interpolation function
-        -> Pipe SimplePoint
-                SimplePoint
-                (StateT ( Maybe SimplePoint
-                        , Producer SimplePoint m ())
-                        m)
-                ()
-barrier interp = forever $ do
-  x <- await
-  y <- lift $ get
-  z <- go x y
-  lift $ put z
-  where go x (prev, barriers) = do
-          lift (lift $ next barriers) >>= \b -> case b of
-            -- no more times to interpolate, yield the rest of the series
-            Left   _      -> yield x >> return (Just x, barriers)
-            Right (y, p') -> case compare (simpleTime y) (simpleTime x) of
-              -- missing some times, interpolate
-              LT -> let prev'        = maybe x id prev
-                        interpolated = interp prev' x (simpleTime y)
-                    in  yield interpolated >> go x (prev, p')
-              -- not missing these times
-              GT -> yield x >> return (Just x, barriers)
-              EQ -> yield x >> return (Just x, barriers)
+
+match :: Monad m
+      => (SimplePoint -> SimplePoint -> TimeStamp -> SimplePoint) -- ^ interpolation function
+      -> Maybe SimplePoint
+      -> Producer SimplePoint m ()
+      -> Producer SimplePoint m ()
+      -> Producer SimplePoint m ()
+match f prev s1 s2 = do
+  a1 <- lift $ next s1
+  a2 <- lift $ next s2
+  case (a1, a2) of
+    (Left _, _) -> return ()
+    (_, Left _) -> s1
+    (Right (x, s1'), Right (y, s2')) -> case compare (simpleTime y) (simpleTime x) of
+      LT -> let prev'        = maybe x id prev
+                interpolated = f prev' x (simpleTime y)
+            in  do yield interpolated
+                   match f prev (yield x >> s1') s2'
+      GT -> yield x >> match f prev s1' (yield y >> s2')
+      EQ -> yield x >> match f prev s1' (yield y >> s2')
+
 
 -- | Align the first series to the times in the second series, e.g.
 --   s1 = [     (2,a)     (5,b) ]
@@ -146,7 +143,7 @@ align :: Monad m
       ->              Query m SimplePoint  -- with times from this one
       ->              Query m SimplePoint
 align (sd, Select s1) (Select s2)
-  = Select $ s1 >-> evalStateP (Nothing, s2) (barrier fun)
+  = Select $ match fun Nothing s1 s2
 
   where interpolate decode encode division x1 x2 t
           | simpleTime x1 == simpleTime x2 = SimplePoint (simpleAddress x1) t (simplePayload x1)
@@ -162,6 +159,7 @@ align (sd, Select s1) (Select s2)
         fun = case fmap T.unpack (lookupSource (T.pack "_float") sd) of
           Just "1" -> interpolate wordToDouble doubleToWord (/)
           _        -> interpolate fromIntegral id           div
+
 
 -- Aggregation -----------------------------------------------------------------
 
