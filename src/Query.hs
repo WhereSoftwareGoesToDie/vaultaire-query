@@ -6,6 +6,7 @@ import           Options.Applicative
 import           Options.Applicative.Types
 import           Network.URI
 import           System.Directory
+import           System.Log.Logger
 import           Text.Read
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as P
@@ -91,6 +92,8 @@ args =   CmdArgs
 
 main :: IO ()
 main = do
+  updateGlobalLogger "Query" (setLevel INFO)
+  infoM "Query" "starting..."
   CmdArgs{..} <- execParser toplevel
   case operation of
     Align sauce1 sauce2 -> evalAlign retry output sauce1 sauce2

@@ -43,7 +43,7 @@ evalExport pol outdir u org start end = do
           h <- liftIO $ do
                 createDirectoryIfMissing False addrdir
                 B8.appendFile (addrdir ++ "/sd") (toWire sd)
-                infoM "Query.Export" $ "Reading points from address " ++ show addr
+                infoM "Query" $ "Reading points from address " ++ show addr
                 IO.openFile pfile IO.WriteMode
           runEffect $   readSimplePoints pol u addr start end org
                     >-> PC.encode
@@ -57,10 +57,11 @@ evalFetch pol outdir (key,val) u org start end = do
   let pf =  concat [outdir, "/", "points"]
   let df =  concat [outdir, "/", "sd"]
   ph     <- IO.openFile df IO.WriteMode
-  addrs  <- getAddresses org (key,val)
+  addrs  <- getAddresses u org (key,val)
   runSafeT $ runEffect
            $ for (each addrs)
                   (\(a,d) -> do liftIO $ B8.writeFile pf $ toWire d
+                                liftIO $ infoM "Query" $ "Reading points from address" ++ show a
                                 readSimplePoints pol u a start end org)
            >-> PC.encode
            >-> PB.toHandle ph
@@ -74,7 +75,7 @@ retrieve _ (File _ p sd) = do
   where hush = P.filter isRight >-> P.map fromRight'
 
 retrieve pol (Vault u org addr start end) = do
-  sd <- maybe mempty id <$> getSourceDict org addr
+  sd <- maybe mempty id <$> getSourceDict u org addr
   return (sd, readSimplePoints pol u addr start end org)
 
 out :: FilePath -> Producer SimplePoint (SafeT IO) () -> IO ()
