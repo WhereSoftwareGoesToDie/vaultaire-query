@@ -41,7 +41,8 @@ mode = subparser
   <> (command "export"
        (info pExport
              (progDesc $ concat
-               ["export simple points for all addresses"]
+               ["export simple points for all addresses"
+               ," e.g. export tcp://foo.com:9999 ABCDEF 0 999"]
              )
         )
      )
@@ -49,7 +50,7 @@ mode = subparser
        (info pFetch
              (progDesc $ concat
                ["fetch data for a metric matching some (key,value), e.g."
-               ," fetch hostname=deadbeef tcp://foo.com:9999 ABCDEF"]
+               ," fetch hostname=deadbeef tcp://foo.com:9999 ABCDEF 0 999"]
              )
        )
      )

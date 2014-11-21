@@ -130,7 +130,7 @@ match f prev s1 s2 = do
             in  do yield interpolated
                    match f prev (yield x >> s1') s2'
       GT -> yield x >> match f prev s1' (yield y >> s2')
-      EQ -> yield x >> match f prev s1' (yield y >> s2')
+      EQ -> yield x >> match f prev s1' s2'
 
 
 -- | Align the first series to the times in the second series, e.g.
