@@ -1,19 +1,17 @@
-{-# LANGUAGE
-    RankNTypes
-  , ScopedTypeVariables
-  , ConstraintKinds
-  , MultiParamTypeClasses
-  , FlexibleContexts
-  , FlexibleInstances
-  , OverlappingInstances
-  #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverlappingInstances  #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 module Vaultaire.Query.Base
        (Query)
 where
 
 import           Control.Monad.Zip
 import           Pipes
-import qualified Pipes.Prelude as P
+import qualified Pipes.Prelude     as P
 
 
 -- "DSL" -----------------------------------------------------------------------

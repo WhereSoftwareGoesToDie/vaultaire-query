@@ -1,11 +1,9 @@
-{-# LANGUAGE
-    FlexibleContexts
-  , TypeOperators
-  , ParallelListComp
-  , MonadComprehensions
-  , TupleSections
-  , RankNTypes
-  #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MonadComprehensions #-}
+{-# LANGUAGE ParallelListComp    #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeOperators       #-}
 -- | Analytics queries on Vaultaire data.
 module Vaultaire.Query
        ( Query
@@ -15,7 +13,7 @@ module Vaultaire.Query
        , M.SimplePoint
          -- * Analytics Queries
        , addresses, addressesAny, addressesAll, addressesWith
-       , metrics, eventMetrics, lookupQ, sumPoints
+       , getMetrics, eventMetrics, lookupQ, sumPoints
        , fitWith , fitSimple, aggregateCumulativePoints
        , align
          -- * Helpful Predicates for Transforming Queries
@@ -25,36 +23,37 @@ module Vaultaire.Query
        )
 where
 
+import           Control.Lens                     (view)
 import           Control.Monad
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State.Strict
-import           Control.Lens (view)
-import           Data.Word
 import           Data.Binary.IEEE754
 import           Data.Either
-import qualified Data.Text                  as T
-import           Data.Text.Encoding         (encodeUtf8)
+import           Data.Maybe
+import qualified Data.Text                        as T
+import           Data.Text.Encoding               (encodeUtf8)
+import           Data.Word
+import           Network.URI
 import           Pipes
 import           Pipes.Lift
-import qualified Pipes.Prelude              as P
-import qualified Pipes.Parse                as P
+import qualified Pipes.Parse                      as P
+import qualified Pipes.Prelude                    as P
 import           Pipes.Safe
-import           Data.Maybe
-import           Network.URI
-import qualified System.ZMQ4                as Z
-import           Prelude hiding (sum, last)
+import           Prelude                          hiding (last, sum)
+import qualified System.ZMQ4                      as Z
 
-import           Vaultaire.Types
+import qualified Chevalier.Types                  as C
+import qualified Chevalier.Util                   as C
+import qualified Marquise.Client                  as M
 import           Marquise.Types
-import qualified Marquise.Types             as M
-import qualified Marquise.Client            as M
-import qualified Chevalier.Util             as C
-import qualified Chevalier.Types            as C
+import qualified Marquise.Types                   as M
+import           Vaultaire.Types
 
+import           Vaultaire.Control.Lift
 import           Vaultaire.Query.Base
 import           Vaultaire.Query.Combinators
 import           Vaultaire.Query.Connection
-import           Vaultaire.Control.Lift
+
 
 -- Ranges ----------------------------------------------------------------------
 
@@ -114,9 +113,9 @@ fitSimple = fitWith interpolateable
 
 match :: Monad m
       => (SimplePoint -> SimplePoint -> TimeStamp -> SimplePoint) -- ^ interpolation function
-      -> Maybe SimplePoint
-      -> Producer SimplePoint m ()
-      -> Producer SimplePoint m ()
+      -> Maybe SimplePoint                                        -- ^ Initial point
+      -> Producer SimplePoint m ()                                -- ^ Align this
+      -> Producer SimplePoint m ()                                -- ^ to this
       -> Producer SimplePoint m ()
 match f prev s1 s2 = do
   a1 <- lift $ next s1
@@ -229,14 +228,15 @@ addressesAll uri origin mds
    ]
 
 -- | Data points for an address over some period of time.
-metrics :: (MonadSafe m, MonadIO m)
-        => URI
-        -> Origin
-        -> Address
-        -> TimeStamp           -- ^ start
-        -> TimeStamp           -- ^ end
-        -> Query m SimplePoint -- ^ result data point
-metrics uri origin addr start end
+getMetrics
+  :: (MonadSafe m, MonadIO m)
+  => URI
+  -> Origin
+  -> Address
+  -> TimeStamp           -- ^ start
+  -> TimeStamp           -- ^ end
+  -> Query m SimplePoint -- ^ result data point
+getMetrics uri origin addr start end
   = Select $ readSimplePoints M.NoRetry uri addr start end origin
 
 -- | To construct event based data correctly we need to query over all time
