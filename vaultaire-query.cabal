@@ -51,7 +51,7 @@ library
                      data-binary-ieee754,
                      vaultaire-common,
                      vaultaire-control,
-                     marquise >= 3.1.0,
+                     marquise >= 3.2.1,
                      chevalier-common
 
   ghc-options:       -O2
