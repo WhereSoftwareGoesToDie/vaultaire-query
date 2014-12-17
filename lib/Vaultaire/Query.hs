@@ -244,11 +244,11 @@ eventMetrics :: (MonadIO m, MonadSafe m)
              => URI
              -> Origin
              -> Address
+             -> TimeStamp
+             -> TimeStamp
              -> Query m SimplePoint -- ^ result data point
-eventMetrics uri origin addr = Select $ do
-  let start = TimeStamp 0
-  end <- liftIO getCurrentTimeNanoseconds
-  readSimplePoints M.NoRetry uri addr start end origin
+eventMetrics uri origin addr _start end
+  = Select $ readSimplePoints M.NoRetry uri addr (TimeStamp 0) end origin
 
 -- Raw Marquise queries -------------------------------------------------------
 
