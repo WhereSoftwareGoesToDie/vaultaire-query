@@ -47,7 +47,7 @@ library
                      pipes-safe,
                      pipes-parse,
                      text,
-                     zeromq4-haskell,
+                     zeromq4-haskell >= 0.6.3,
                      data-binary-ieee754,
                      vaultaire-common,
                      vaultaire-control,
