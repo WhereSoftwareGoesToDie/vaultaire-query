@@ -36,7 +36,7 @@ library
      build-depends: network-uri < 2.6, network < 2.6
   build-depends:     base >=4.7 && <4.8,
                      containers >=0.5 && <0.6,
-                     mtl >= 2.2,
+                     mtl >= 2.1,
                      transformers,
                      hslogger,
                      either,
@@ -73,7 +73,7 @@ executable query
   else
      build-depends: network-uri < 2.6, network < 2.6
   build-depends:     base >=3 && <5,
-                     mtl >= 2.2,
+                     mtl >= 2.1,
                      optparse-applicative,
                      bytestring,
                      directory,
@@ -108,7 +108,7 @@ test-suite           query-tests
   default-language:  Haskell2010
   build-depends:     base >=3 && <5,
                      containers >=0.5 && <0.6,
-                     mtl >= 2.2,
+                     mtl >= 2.1,
                      pipes,
                      time,
                      ieee754,
