@@ -6,7 +6,7 @@ module Parse
 where
 
 import           Control.Applicative hiding ((<|>))
-import           Control.Monad.Except
+import           Control.Monad
 import qualified Data.ByteString.Char8 as B
 import           Data.Char
 import           Data.Binary.IEEE754
