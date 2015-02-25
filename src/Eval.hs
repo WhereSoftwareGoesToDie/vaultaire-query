@@ -3,7 +3,7 @@
 module Eval where
 
 import           Control.Applicative
-import           Control.Monad.Except
+import           Control.Monad
 import           Data.Either.Combinators
 import           Data.Monoid
 import qualified Data.ByteString.Char8 as B8
