@@ -39,7 +39,6 @@ import qualified Pipes.Parse                      as P
 import qualified Pipes.Prelude                    as P
 import           Pipes.Safe
 import           Prelude                          hiding (last, sum)
-import           System.Log.Logger
 import qualified System.ZMQ4                      as Z
 
 import qualified Chevalier.Types                  as C
@@ -256,18 +255,14 @@ readSimplePoints :: (MonadIO m, MonadSafe m)
            -> Producer SimplePoint m ()
 readSimplePoints uri a s e o = runMarquiseReader uri $ do
   (MarquiseReader c) <- lift ask
-  void $ hoist liftIO $ catch
-       (M.readSimplePoints a s e o c)
-       (\(MarquiseException err) -> lift $ errorM "Vaultaire.Query.readSimplePoints" err)
+  hoist liftIO $ M.readSimplePoints a s e o c
 
 enumerateOrigin :: (MonadIO m, MonadSafe m)
                 => URI -> Origin
                 -> Producer (Address, SourceDict) m ()
 enumerateOrigin uri o = runMarquiseContents uri $ do
   (MarquiseContents c) <- liftT ask
-  void $ hoist liftIO $ catch
-       (M.enumerateOrigin o c)
-       (\(MarquiseException e) -> lift $ errorM "Vaultaire.Query.enumerateOrigin" e)
+  hoist liftIO $ M.enumerateOrigin o c
 
 -- Built-in Chevalier Queries --------------------------------------------------
 
