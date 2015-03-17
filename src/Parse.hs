@@ -21,7 +21,6 @@ import           Text.Parsec.Error
 import           Text.Read
 
 import           Vaultaire.Types
-import           Marquise.Types
 
 data Source
    = File  Format FilePath FilePath

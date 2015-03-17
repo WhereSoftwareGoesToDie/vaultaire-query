@@ -11,7 +11,6 @@ import           Text.Read
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as P
 
-import           Vaultaire.Query
 import           Vaultaire.Types
 import           Parse
 import           Eval
@@ -23,7 +22,6 @@ data Mode
 
 data CmdArgs
   = CmdArgs { output    :: FilePath
-            , retry     :: Policy
             , operation :: Mode }
   deriving Generic
 
@@ -79,16 +77,7 @@ args :: Parser CmdArgs
 args =   CmdArgs
      <$> strOption (  long "output" <> short 'o' <> metavar "OUT"
                    <> help "output file" )
-     <*> option    (  readerAsk >>= policies)
-                   (  long "retry" <> short 'r' <> metavar "RETRY"
-                   <> value ForeverRetry
-                   <> help "retry on backend failure? options := forever | no | <number>")
      <*> mode
-  where policies s | s == "forever" = return ForeverRetry
-                   | s == "no"      = return NoRetry
-                   | otherwise      = maybe (readerError "can't read retry policy")
-                                            (return . JustRetry)
-                                            (readMaybe s)
 
 main :: IO ()
 main = do
@@ -96,10 +85,10 @@ main = do
   infoM "Query" "starting..."
   CmdArgs{..} <- execParser toplevel
   case operation of
-    Align sauce1 sauce2 -> evalAlign retry output sauce1 sauce2
+    Align sauce1 sauce2 -> evalAlign output sauce1 sauce2
     Export u org s e    -> createDirectoryIfMissing True output
-                        >> evalExport retry output u org s e
+                        >> evalExport output u org s e
     Fetch q u org s e   -> createDirectoryIfMissing True output
-                        >> evalFetch retry output q u org s e
+                        >> evalFetch output q u org s e
 
   where toplevel = info (helper <*> args) (fullDesc <> header "Simple query CLI")
