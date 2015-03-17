@@ -9,7 +9,6 @@ module Vaultaire.Query
        ( Query
        , module Vaultaire.Query.Combinators
        , module Vaultaire.Query.Connection
-       , M.Policy(..)
        , M.SimplePoint
          -- * Analytics Queries
        , addresses, addressesAny, addressesAll, addressesWith
@@ -40,13 +39,13 @@ import qualified Pipes.Parse                      as P
 import qualified Pipes.Prelude                    as P
 import           Pipes.Safe
 import           Prelude                          hiding (last, sum)
+import           System.Log.Logger
 import qualified System.ZMQ4                      as Z
 
 import qualified Chevalier.Types                  as C
 import qualified Chevalier.Util                   as C
 import qualified Marquise.Client                  as M
 import           Marquise.Types
-import qualified Marquise.Types                   as M
 import           Vaultaire.Types
 
 import           Vaultaire.Control.Lift
@@ -124,7 +123,7 @@ match f prev s1 s2 = do
     (Left _, _) -> return ()
     (_, Left _) -> s1
     (Right (x, s1'), Right (y, s2')) -> case compare (simpleTime y) (simpleTime x) of
-      LT -> let prev'        = maybe x id prev
+      LT -> let prev'        = fromMaybe x prev
                 interpolated = f prev' x (simpleTime y)
             in  do yield interpolated
                    match f prev (yield x >> s1') s2'
@@ -200,7 +199,7 @@ addresses :: (MonadIO m, MonadSafe m)
           => URI
           -> Origin
           -> Query m (Address, SourceDict) -- ^ result address and its metadata map
-addresses uri origin = Select $ enumerateOrigin M.NoRetry uri origin
+addresses uri origin = Select $ enumerateOrigin uri origin
 
 -- | Addresses whose metadata match (fuzzily) any in a set of metadata key-values.
 --   e.g. @addressesAny origin [("nginx", "error-rates"), ("metric", "cpu")]@
@@ -237,7 +236,7 @@ getMetrics
   -> TimeStamp           -- ^ end
   -> Query m SimplePoint -- ^ result data point
 getMetrics uri origin addr start end
-  = Select $ readSimplePoints M.NoRetry uri addr start end origin
+  = Select $ readSimplePoints uri addr start end origin
 
 -- | To construct event based data correctly we need to query over all time
 eventMetrics :: (MonadIO m, MonadSafe m)
@@ -248,29 +247,27 @@ eventMetrics :: (MonadIO m, MonadSafe m)
              -> TimeStamp
              -> Query m SimplePoint -- ^ result data point
 eventMetrics uri origin addr _start end
-  = Select $ readSimplePoints M.NoRetry uri addr (TimeStamp 0) end origin
+  = Select $ readSimplePoints uri addr (TimeStamp 0) end origin
 
 -- Raw Marquise queries -------------------------------------------------------
 
 readSimplePoints :: (MonadIO m, MonadSafe m)
-           => M.Policy
-           -> URI -> Address -> TimeStamp -> TimeStamp -> Origin
+           => URI -> Address -> TimeStamp -> TimeStamp -> Origin
            -> Producer SimplePoint m ()
-readSimplePoints pol uri a s e o = runMarquiseReader uri $ do
+readSimplePoints uri a s e o = runMarquiseReader uri $ do
   (MarquiseReader c) <- lift ask
-  hoist liftIO $  catchMarquiseAll (M.readSimplePoints pol a s e o c)
-                                   (\x -> lift $ M.logError $ show x)
-               >> return ()
+  void $ hoist liftIO $ catch
+       (M.readSimplePoints a s e o c)
+       (\(MarquiseException err) -> lift $ errorM "Vaultaire.Query.readSimplePoints" err)
 
 enumerateOrigin :: (MonadIO m, MonadSafe m)
-                => M.Policy
-                -> URI -> Origin
+                => URI -> Origin
                 -> Producer (Address, SourceDict) m ()
-enumerateOrigin pol uri o = runMarquiseContents uri $ do
+enumerateOrigin uri o = runMarquiseContents uri $ do
   (MarquiseContents c) <- liftT ask
-  hoist liftIO $  catchMarquiseAll (M.enumerateOrigin pol o c)
-                                   (\e -> lift $ M.logError $ show e)
-               >> return ()
+  void $ hoist liftIO $ catch
+       (M.enumerateOrigin o c)
+       (\(MarquiseException e) -> lift $ errorM "Vaultaire.Query.enumerateOrigin" e)
 
 -- Built-in Chevalier Queries --------------------------------------------------
 
